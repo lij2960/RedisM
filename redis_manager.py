@@ -629,6 +629,8 @@ tkinter GUI框架
         
     def on_db_change(self, event):
         if self.redis_client:
+            # 重置总键数估计
+            self.total_keys_estimate = None
             db_num = int(self.db_var.get().split()[1])
             self.redis_client.execute_command('SELECT', db_num)
             self.search_keys()
@@ -637,39 +639,87 @@ tkinter GUI框架
         if not self.redis_client:
             return
             
+        # 重置总键数估计
+        self.total_keys_estimate = None
+            
         def search_thread():
             try:
                 pattern = self.search_var.get() or "*"
                 max_keys = self.current_conn.get('max_keys', 0)
                 
-                # 尝试KEYS命令，如果失败则使用SCAN
-                try:
-                    if max_keys > 0:
-                        # 使用SCAN限制数量
-                        keys = []
-                        for key in self.redis_client.scan_iter(match=pattern):
-                            keys.append(key)
-                            if len(keys) >= max_keys:
-                                break
-                    else:
-                        keys = self.redis_client.keys(pattern)
-                except redis.ResponseError as e:
-                    if "NOPERM" in str(e) or "no permission" in str(e):
-                        keys = []
-                        for key in self.redis_client.scan_iter(match=pattern):
-                            keys.append(key)
-                            if max_keys > 0 and len(keys) >= max_keys:
-                                break
-                    else:
-                        raise
+                self.root.after(0, lambda: self.status_label.config(text="Loading keys..."))
                 
-                self.current_keys = keys
-                self.root.after(0, lambda: self.update_keys_tree(keys))
+                if max_keys == 0:
+                    # 无限制模式 - 使用流式加载
+                    self.load_keys_streaming(pattern)
+                else:
+                    # 限制模式 - 快速加载指定数量
+                    keys = []
+                    for key in self.redis_client.scan_iter(match=pattern, count=1000):
+                        keys.append(key)
+                        if len(keys) >= max_keys:
+                            break
+                    
+                    self.current_keys = keys
+                    self.root.after(0, lambda: self.update_keys_tree(keys))
                 
             except Exception as e:
-                self.root.after(0, lambda: self.status_label.config(text=f"Failed to get keys: {e}"))
+                error_msg = str(e)
+                self.root.after(0, lambda msg=error_msg: self.status_label.config(text=f"Failed to get keys: {msg}"))
         
         threading.Thread(target=search_thread, daemon=True).start()
+        
+    def load_keys_streaming(self, pattern):
+        """流式加载键，最大100000个"""
+        try:
+            keys = []
+            count = 0
+            max_keys = 100000
+            
+            # 先获取当前数据库的总键数
+            try:
+                info = self.redis_client.info('keyspace')
+                current_db = int(self.db_var.get().split()[1]) if hasattr(self, 'db_var') and self.db_var.get() else 0
+                db_key = f'db{current_db}'
+                total_keys = info.get(db_key, {}).get('keys', None) if db_key in info else None
+            except:
+                total_keys = None
+            
+            for key in self.redis_client.scan_iter(match=pattern, count=1000):
+                keys.append(key)
+                count += 1
+                
+                # 更新状态
+                if count % 2000 == 0:
+                    if total_keys:
+                        status_text = f"Loading keys... ({count} loaded, total ~{total_keys})"
+                    else:
+                        status_text = f"Loading keys... ({count} loaded)"
+                    self.root.after(0, lambda t=status_text: self.status_label.config(text=t))
+                    time.sleep(0.1)
+                
+                # 超过100000个键时停止加载
+                if count >= max_keys:
+                    break
+            
+            # 所有键加载完成后一次性更新树结构
+            self.current_keys = keys
+            self.total_keys_estimate = total_keys
+            self.root.after(0, lambda: self.update_keys_tree(self.current_keys))
+            
+            # 显示最终状态
+            if total_keys and count >= max_keys:
+                final_status = f"Loaded {count} keys (showing {count} of ~{total_keys} total)"
+            elif total_keys:
+                final_status = f"Loaded {count} keys (all of ~{total_keys} total)"
+            else:
+                final_status = f"Loaded {count} keys (all)"
+            
+            self.root.after(0, lambda t=final_status: self.status_label.config(text=t))
+            
+        except Exception as e:
+            error_msg = str(e)
+            self.root.after(0, lambda: self.status_label.config(text=f"Failed to load keys: {error_msg}"))
         
     def update_keys_tree(self, keys):
         # 清空树
@@ -745,8 +795,8 @@ tkinter GUI框架
         add_tree_items("", tree_structure)
         
         self.status_label.config(text=f"Found {len(keys)} keys" + 
-                                (f" (limited to {self.current_conn.get('max_keys', 0)})" 
-                                 if self.current_conn.get('max_keys', 0) > 0 and len(keys) >= self.current_conn.get('max_keys', 0) 
+                                (f" (showing {len(keys)} of ~{self.total_keys_estimate} total)" 
+                                 if hasattr(self, 'total_keys_estimate') and self.total_keys_estimate and self.total_keys_estimate > len(keys) 
                                  else ""))
         
     def count_keys_in_structure(self, structure):
