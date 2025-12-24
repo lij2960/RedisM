@@ -7,67 +7,14 @@
 ![Python](https://img.shields.io/badge/python-3.8+-green.svg)
 ![License](https://img.shields.io/badge/license-MIT-orange.svg)
 
-## 📸 应用截图
-
-### 主界面
-- 左侧连接管理面板，支持多连接配置
-- 右侧键值管理和命令行界面
-- 树形结构显示Redis键，支持分组折叠
-
-### 键值编辑
-- Hash类型专用编辑器，支持JSON格式化
-- 所有Redis数据类型的可视化编辑
-- 实时查询和命令执行
-
-## 🎯 核心亮点
+## 🎯 核心特性
 
 - **🚀 高性能**: 流式加载大量键，最多支持100,000个键的高效管理
 - **🔐 安全连接**: 完整的SSH隧道支持，可安全访问内网Redis服务器
 - **🎨 用户友好**: 现代化GUI界面，直观的操作流程
 - **⚡ 实时响应**: 非阻塞UI设计，大数据量下依然流畅
 - **🔧 专业工具**: 内置Redis命令行，支持所有Redis命令
-
-## ✨ 功能特性
-
-### 🔗 连接管理
-- 支持多个Redis连接配置
-- 支持用户名/密码认证
-- 支持SSH隧道连接（密码和私钥认证）
-- 支持多种私钥格式（PEM、OpenSSH、Ed25519等）
-- 私钥文件浏览器选择
-- 连接配置自动保存和加载
-- 自动连接保活机制
-
-### 🗄️ 数据库操作
-- 支持16个Redis数据库切换
-- 键搜索和模式匹配（支持通配符*）
-- 多级分隔符分组显示键（树形结构，默认收起）
-- 支持所有Redis数据类型（String、List、Set、Hash、ZSet）
-- 智能键数量管理（最多100,000个键，自动批量加载）
-- 实时显示当前数据库键数统计
-
-### 🔧 键值管理
-- 查看键详情（类型、TTL、值大小）
-- 可视化编辑各种数据类型
-- Hash类型专用编辑器（支持字段和值同时编辑）
-- JSON格式化和压缩功能
-- Redis命令查询支持（HGET、LRANGE、ZRANGE等）
-- 批量操作和更新
-- 键的添加、删除、刷新
-
-### 💻 命令行界面
-- 内置Redis命令行终端
-- 支持所有Redis命令
-- 命令历史记录
-- 结果格式化显示
-- 实时命令执行
-
-### 🎨 用户界面
-- 现代化的GUI界面
-- 响应式布局设计
-- 大窗口支持（1600x1000）
-- 滚动支持的对话框
-- 直观的操作流程
+- **📊 智能分组**: 自动按分隔符分组显示键，支持树形结构
 
 ## 🖥️ 系统要求
 
@@ -89,26 +36,7 @@ pip3 install redis paramiko pyinstaller
 
 ## 🚀 快速开始
 
-### 方式一：直接下载使用（推荐）
-
-1. **下载应用**
-   - 从 [Releases](https://github.com/your-repo/RedisM/releases) 页面下载最新版本
-   - 或者下载 DMG 安装包
-
-2. **安装应用**
-   ```bash
-   # 方法1：拖拽安装
-   # 将 RedisM.app 拖拽到 Applications 文件夹
-   
-   # 方法2：命令行安装
-   cp -r RedisM.app /Applications/
-   ```
-
-3. **首次运行**
-   - 双击打开 RedisM
-   - 如遇到安全提示，参考 [首次运行配置](#-首次运行配置)
-
-### 方式二：开发者模式
+### 方式一：直接运行（开发模式）
 ```bash
 # 克隆项目
 git clone <repository-url>
@@ -121,7 +49,7 @@ pip3 install -r requirements.txt
 python3 redis_manager.py
 ```
 
-### 编译为Mac应用程序
+### 方式二：编译为Mac应用程序
 
 1. **准备环境**
 ```bash
@@ -196,18 +124,20 @@ xattr -cr /Applications/RedisM.app
 3. 按回车或点击"Execute"执行
 4. 查看格式化的执行结果
 
-## 📊 性能特性
+## 🏗️ 项目结构
 
-### 智能键管理
-- **流式加载**: 采用分批流式加载技术，支持大量键的高效管理
-- **智能限制**: 自动限制最多100,000个键，防止内存溢出
-- **实时统计**: 显示当前数据库的键数统计信息
-- **非阻塞UI**: 后台加载数据，界面始终保持响应
-
-### 连接优化
-- **连接池**: 自动管理Redis连接池，提高性能
-- **保活机制**: 自动保持连接活跃，防止超时断开
-- **SSH优化**: 高效的SSH隧道管理，支持多种认证方式
+```
+RedisM/
+├── redis_manager.py      # 主应用程序
+├── config.py            # 配置文件
+├── connection_manager.py # 连接管理模块
+├── key_manager.py       # 键管理模块
+├── create_icon.py       # 图标生成脚本
+├── requirements.txt     # Python依赖清单
+├── build_python.sh      # macOS构建脚本
+├── .gitignore          # Git忽略文件
+└── README.md           # 项目文档
+```
 
 ## 🔌 支持的Redis版本
 
@@ -241,7 +171,6 @@ xattr -cr /Applications/RedisM.app
 - ✅ **大量键加载慢**: 调整最大键数限制，或使用搜索模式缩小范围
 - ✅ **界面卡顿**: 应用采用流式加载，最多支持10万个键的高效管理
 - ✅ **内存占用高**: 关闭不需要的连接，清理键缓存
-- ✅ **SSH连接超时**: 检查网络连接和防火墙设置
 
 ### 配置文件位置
 ```bash
@@ -258,38 +187,27 @@ rm ~/.redis_manager_config.json
 
 #### 新增功能
 - ✨ 初始版本发布
-- ✨ 支持多连Redis接配置管理
+- ✨ 支持多Redis连接配置管理
 - ✨ SSH隧道连接支持（密码和私钥认证）
 - ✨ 所有Redis数据类型的可视化编辑
 - ✨ Hash类型专用编辑器和JSON格式化
 - ✨ 内置Redis命令行终端
+- ✨ 模块化代码结构
 
 #### 性能优化
 - ⚡ 流式加载大量键（最多100,000个）
 - ⚡ 非阻塞UI设计，界面始终响应
 - ⚡ 智能批量加载和实时进度显示
 - ⚡ 自动连接保活机制
+- ⚡ 大Hash数据分批读取优化
 
 #### 用户体验
 - 🎨 现代化GUI界面设计
 - 🎨 树形结构显示键，支持分组折叠
+- 🎨 智能分组优化（单键分组自动展开）
 - 🎨 响应式布局，支持大窗口显示
-- 🎨 滚动支持的对话框和表单
 
 ## 🏗️ 开发信息
-
-### 项目结构
-```
-RedisM/
-├── redis_manager.py      # 主应用程序
-├── create_icon.py        # 图标生成脚本
-├── requirements.txt      # Python依赖清单
-├── build_python.sh       # macOS构建脚本
-├── RedisManager.spec     # PyInstaller配置
-├── .gitignore           # Git忽略文件
-├── README.md            # 项目文档
-└── INSTALL_GUIDE.md     # 安装指南
-```
 
 ### 技术栈
 - **GUI框架**: tkinter (Python标准库)
@@ -302,19 +220,6 @@ RedisM/
 - **当前版本**: v1.0.0
 - **Python版本**: 3.8+
 - **支持平台**: macOS (Intel/Apple Silicon)
-
-### 添加新功能
-1. 修改 `redis_manager.py` 主程序
-2. 更新 `requirements.txt` 依赖（如需要）
-3. 测试功能完整性
-4. 更新版本号常量
-5. 重新构建应用程序
-
-### 构建配置
-- **应用名称**: 在 `__app_name__` 常量中定义
-- **版本号**: 在 `__version__` 常量中定义
-- **Bundle ID**: com.redismanager.app
-- **目标架构**: x86_64 (可修改为universal2支持Apple Silicon)
 
 ## 📄 许可证
 

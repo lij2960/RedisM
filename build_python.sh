@@ -1,13 +1,13 @@
 #!/bin/bash
 
-# Python Redis Manager Mac应用打包脚本
+# RedisM Mac应用打包脚本
 
 PYTHON_SCRIPT="redis_manager.py"
 ICON_SCRIPT="create_icon.py"
 VENV_DIR="venv"
 PYTHON_BIN="/usr/local/bin/python3.14"
 
-echo "开始构建Redis Manager..."
+echo "开始构建RedisM..."
 
 # 检查Python环境
 if ! command -v "$PYTHON_BIN" &> /dev/null; then
@@ -26,9 +26,9 @@ fi
 echo "激活虚拟环境..."
 source "$VENV_DIR/bin/activate"
 
-# 从 Python 文件中读取应用名称和版本号
-APP_NAME=$(python3 -c "exec(open('redis_manager.py').read()); print(__app_name__)")
-VERSION=$(python3 -c "exec(open('redis_manager.py').read()); print(__version__)")
+# 从配置文件中读取应用名称和版本号
+APP_NAME=$(python3 -c "from config import __app_name__; print(__app_name__)")
+VERSION=$(python3 -c "from config import __version__; print(__version__)")
 
 echo "构建 $APP_NAME v$VERSION..."
 
@@ -53,16 +53,14 @@ rm -rf build dist *.spec
 # 创建应用程序包
 echo "创建Mac应用程序包..."
 
-# 更新Info.plist中的版本信息
-sed -i '' "s/<string>RedisManager<\/string>/<string>$APP_NAME<\/string>/g" Info.plist
-sed -i '' "s/<string>1\.0\.0<\/string>/<string>$VERSION<\/string>/g" Info.plist
-
 pyinstaller --onedir --windowed \
     --name="$APP_NAME" \
     $ICON_FILE \
     --osx-bundle-identifier="com.redismanager.app" \
     --target-arch=x86_64 \
-    --add-data="Info.plist:Contents" \
+    --hidden-import=config \
+    --hidden-import=connection_manager \
+    --hidden-import=key_manager \
     "$PYTHON_SCRIPT"
 
 # 检查构建结果
