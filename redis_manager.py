@@ -1275,28 +1275,50 @@ tkinter GUI框架
             
         def load_thread():
             try:
+                # 检查键是否存在
+                if not self.redis_client.exists(key):
+                    self.root.after(0, lambda: messagebox.showerror("Error", f"Key '{key}' does not exist"))
+                    return
+                
                 # 获取键信息
                 key_type = self.redis_client.type(key)
                 ttl = self.redis_client.ttl(key)
                 
                 # 获取值
-                if key_type == 'string':
-                    value = self.redis_client.get(key)
-                elif key_type == 'list':
-                    value = self.redis_client.lrange(key, 0, -1)
-                elif key_type == 'set':
-                    value = list(self.redis_client.smembers(key))
-                elif key_type == 'hash':
-                    value = self.redis_client.hgetall(key)
-                elif key_type == 'zset':
-                    value = self.redis_client.zrange(key, 0, -1, withscores=True)
-                else:
-                    value = str(self.redis_client.dump(key))
+                value = None
+                try:
+                    if key_type == 'string':
+                        value = self.redis_client.get(key)
+                    elif key_type == 'list':
+                        value = self.redis_client.lrange(key, 0, -1)
+                    elif key_type == 'set':
+                        value = list(self.redis_client.smembers(key))
+                    elif key_type == 'hash':
+                        # 对hash类型使用更安全的读取方式
+                        hash_len = self.redis_client.hlen(key)
+                        if hash_len > 1000:  # 大hash分批读取
+                            value = {}
+                            cursor = 0
+                            while True:
+                                cursor, fields = self.redis_client.hscan(key, cursor, count=100)
+                                value.update(fields)
+                                if cursor == 0:
+                                    break
+                        else:
+                            value = self.redis_client.hgetall(key)
+                    elif key_type == 'zset':
+                        value = self.redis_client.zrange(key, 0, -1, withscores=True)
+                    else:
+                        value = str(self.redis_client.dump(key))
+                except Exception as e:
+                    # 如果读取失败，尝试获取基本信息
+                    value = f"Error reading value: {str(e)}"
                 
                 self.root.after(0, lambda: self.show_key_details(key, key_type, ttl, value))
                 
             except Exception as e:
-                self.root.after(0, lambda: messagebox.showerror("Error", f"Failed to load key: {e}"))
+                error_msg = f"Failed to load key '{key}': {str(e)}"
+                self.root.after(0, lambda: messagebox.showerror("Error", error_msg))
         
         threading.Thread(target=load_thread, daemon=True).start()
         
