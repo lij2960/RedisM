@@ -1447,11 +1447,31 @@ tkinter GUI框架
         table_frame = ttk.Frame(parent)
         table_frame.pack(fill=tk.BOTH, expand=True, padx=5, pady=5)
         
+        # 配置Treeview样式，增加行间距和悬停效果
+        style = ttk.Style()
+        
+        # 为不同数据类型创建不同的样式
+        style_name = f"Structured.{key_type}.Treeview"
+        
+        # 配置行高（增加间距）
+        style.configure(style_name, rowheight=28)  # 默认是20，增加到28
+        
+        # 配置选中和悬停颜色
+        style.map(style_name,
+                 background=[('selected', '#007AFF'),
+                           ('active', '#E8F4FD')],  # 悬停时的浅蓝色背景
+                 foreground=[('selected', 'white'),
+                           ('active', 'black')])
+        
         if key_type == 'hash':
             columns = ('Field', 'Value')
-            self.data_tree = ttk.Treeview(table_frame, columns=columns, show='headings')
+            self.data_tree = ttk.Treeview(table_frame, columns=columns, show='headings', style=style_name)
             self.data_tree.heading('Field', text='Field')
             self.data_tree.heading('Value', text='Value')
+            
+            # 设置列宽
+            self.data_tree.column('Field', width=150, minwidth=100)
+            self.data_tree.column('Value', width=300, minwidth=200)
             
             # 加载hash数据
             if isinstance(value, dict):
@@ -1459,9 +1479,13 @@ tkinter GUI框架
                     self.data_tree.insert('', tk.END, values=(field, val))
         elif key_type == 'list':
             columns = ('Index', 'Value')
-            self.data_tree = ttk.Treeview(table_frame, columns=columns, show='headings')
+            self.data_tree = ttk.Treeview(table_frame, columns=columns, show='headings', style=style_name)
             self.data_tree.heading('Index', text='Index')
             self.data_tree.heading('Value', text='Value')
+            
+            # 设置列宽
+            self.data_tree.column('Index', width=80, minwidth=60)
+            self.data_tree.column('Value', width=400, minwidth=200)
             
             # 加载list数据
             if isinstance(value, list):
@@ -1469,8 +1493,11 @@ tkinter GUI框架
                     self.data_tree.insert('', tk.END, values=(i, val))
         elif key_type == 'set':
             columns = ('Value',)
-            self.data_tree = ttk.Treeview(table_frame, columns=columns, show='headings')
+            self.data_tree = ttk.Treeview(table_frame, columns=columns, show='headings', style=style_name)
             self.data_tree.heading('Value', text='Value')
+            
+            # 设置列宽
+            self.data_tree.column('Value', width=400, minwidth=200)
             
             # 加载set数据
             if isinstance(value, (list, set)):
@@ -1478,9 +1505,13 @@ tkinter GUI框架
                     self.data_tree.insert('', tk.END, values=(val,))
         elif key_type == 'zset':
             columns = ('Score', 'Member')
-            self.data_tree = ttk.Treeview(table_frame, columns=columns, show='headings')
+            self.data_tree = ttk.Treeview(table_frame, columns=columns, show='headings', style=style_name)
             self.data_tree.heading('Score', text='Score')
             self.data_tree.heading('Member', text='Member')
+            
+            # 设置列宽
+            self.data_tree.column('Score', width=100, minwidth=80)
+            self.data_tree.column('Member', width=300, minwidth=200)
             
             # 加载zset数据
             if isinstance(value, list):
@@ -1495,7 +1526,9 @@ tkinter GUI框架
         tree_scroll.pack(side=tk.RIGHT, fill=tk.Y)
         self.data_tree.configure(yscrollcommand=tree_scroll.set)
         
-        # 绑定双击编辑事件
+        # 绑定鼠标事件以实现悬停效果
+        self.data_tree.bind('<Motion>', self.on_treeview_motion)
+        self.data_tree.bind('<Leave>', self.on_treeview_leave)
         self.data_tree.bind('<Double-1>', lambda e: self.edit_table_item(key, key_type))
         
         # 操作按钮
@@ -1555,6 +1588,39 @@ tkinter GUI框架
         except Exception as e:
             messagebox.showerror("Query Error", f"Failed to get range: {e}")
             
+    def on_treeview_motion(self, event):
+        """处理Treeview鼠标移动事件，实现悬停效果"""
+        try:
+            # 获取鼠标位置的item
+            item = self.data_tree.identify_row(event.y)
+            
+            # 如果有之前悬停的item且不是当前选中的，清除悬停状态
+            if hasattr(self, '_hover_item') and self._hover_item != item:
+                if self._hover_item and self._hover_item not in self.data_tree.selection():
+                    # 清除之前的悬停状态
+                    pass
+            
+            # 设置当前悬停的item
+            if item:
+                self._hover_item = item
+                # 如果不是选中状态，设置悬停状态
+                if item not in self.data_tree.selection():
+                    self.data_tree.set(item, '#0', '')  # 触发重绘
+            else:
+                self._hover_item = None
+                
+        except Exception:
+            pass
+    
+    def on_treeview_leave(self, event):
+        """处理Treeview鼠标离开事件"""
+        try:
+            # 清除悬停状态
+            if hasattr(self, '_hover_item'):
+                self._hover_item = None
+        except Exception:
+            pass
+    
     def edit_table_item(self, key, key_type):
         """编辑表格项"""
         selection = self.data_tree.selection()
