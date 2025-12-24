@@ -210,6 +210,17 @@ class RedisManager:
                  style='Title.TLabel').pack()
         
     def setup_cli(self, parent):
+        # Redis命令列表
+        self.redis_commands = [
+            'GET', 'SET', 'DEL', 'EXISTS', 'KEYS', 'TYPE', 'TTL', 'EXPIRE',
+            'HGET', 'HSET', 'HDEL', 'HKEYS', 'HVALS', 'HGETALL', 'HEXISTS',
+            'LLEN', 'LPUSH', 'RPUSH', 'LPOP', 'RPOP', 'LRANGE', 'LINDEX',
+            'SADD', 'SREM', 'SMEMBERS', 'SCARD', 'SISMEMBER',
+            'ZADD', 'ZREM', 'ZRANGE', 'ZCARD', 'ZSCORE',
+            'PING', 'INFO', 'SELECT', 'FLUSHDB', 'FLUSHALL', 'DBSIZE',
+            'INCR', 'DECR', 'INCRBY', 'DECRBY', 'APPEND', 'STRLEN'
+        ]
+        
         # 命令输入
         cmd_input_frame = ttk.LabelFrame(parent, text="⌨️ Command Input", padding="10")
         cmd_input_frame.pack(fill=tk.X, pady=(0, 15))
@@ -219,15 +230,23 @@ class RedisManager:
         
         ttk.Label(input_frame, text="redis>", font=('SF Pro Display', 11, 'bold')).pack(side=tk.LEFT, padx=(0, 5))
         self.cmd_var = tk.StringVar()
-        cmd_entry = ttk.Entry(input_frame, textvariable=self.cmd_var, font=('Menlo', 11))
-        cmd_entry.pack(side=tk.LEFT, fill=tk.X, expand=True, padx=(0, 10))
-        cmd_entry.bind('<Return>', lambda e: self.execute_command())
+        self.cmd_entry = ttk.Entry(input_frame, textvariable=self.cmd_var, font=('Menlo', 11))
+        self.cmd_entry.pack(side=tk.LEFT, fill=tk.X, expand=True, padx=(0, 10))
+        self.cmd_entry.bind('<Return>', lambda e: self.execute_command())
+        self.cmd_entry.bind('<KeyRelease>', self.on_cmd_key_release)
+        self.cmd_entry.bind('<Tab>', self.on_cmd_tab)
         
         btn_frame = ttk.Frame(input_frame)
         btn_frame.pack(side=tk.RIGHT)
         
         ttk.Button(btn_frame, text="▶️ Execute", command=self.execute_command).pack(side=tk.LEFT, padx=(0, 5))
         ttk.Button(btn_frame, text="🗑️ Clear", command=self.clear_output).pack(side=tk.LEFT)
+        
+        # 命令提示框架
+        self.suggestion_frame = ttk.Frame(cmd_input_frame)
+        self.suggestion_listbox = tk.Listbox(self.suggestion_frame, height=5, font=('Menlo', 9))
+        self.suggestion_listbox.bind('<Double-Button-1>', self.on_suggestion_select)
+        self.suggestion_listbox.bind('<Return>', self.on_suggestion_select)
         
         # 输出区域
         output_frame = ttk.LabelFrame(parent, text="📊 Output", padding="10")
@@ -1754,11 +1773,74 @@ tkinter GUI框架
                 
                 self.root.after(0, lambda: self.append_output(output))
                 self.root.after(0, lambda: self.cmd_var.set(""))
+                self.root.after(0, self.hide_suggestions)
                 
             except Exception as e:
                 self.root.after(0, lambda: self.append_output(f"Error: {e}"))
         
         threading.Thread(target=execute_thread, daemon=True).start()
+        
+    def on_cmd_key_release(self, event):
+        """处理命令输入的键盘事件"""
+        if event.keysym in ['Up', 'Down', 'Left', 'Right', 'Return', 'Tab']:
+            return
+            
+        current_text = self.cmd_var.get().upper()
+        if not current_text:
+            self.hide_suggestions()
+            return
+            
+        # 查找匹配的命令
+        matches = [cmd for cmd in self.redis_commands if cmd.startswith(current_text)]
+        
+        if matches:
+            self.show_suggestions(matches)
+        else:
+            self.hide_suggestions()
+            
+    def on_cmd_tab(self, event):
+        """处理Tab键自动完成"""
+        current_text = self.cmd_var.get().upper()
+        if not current_text:
+            return 'break'
+            
+        matches = [cmd for cmd in self.redis_commands if cmd.startswith(current_text)]
+        if matches:
+            # 如果只有一个匹配，直接完成
+            if len(matches) == 1:
+                self.cmd_var.set(matches[0] + ' ')
+                self.cmd_entry.icursor(tk.END)
+                self.hide_suggestions()
+            else:
+                # 多个匹配，显示提示列表
+                self.show_suggestions(matches)
+                
+        return 'break'  # 阻止默认Tab行为
+        
+    def show_suggestions(self, suggestions):
+        """显示命令提示列表"""
+        self.suggestion_listbox.delete(0, tk.END)
+        for suggestion in suggestions[:10]:  # 最多显示10个
+            self.suggestion_listbox.insert(tk.END, suggestion)
+            
+        if not self.suggestion_frame.winfo_viewable():
+            self.suggestion_frame.pack(fill=tk.X, pady=(5, 0))
+            self.suggestion_listbox.pack(fill=tk.X)
+            
+    def hide_suggestions(self):
+        """隐藏命令提示列表"""
+        if self.suggestion_frame.winfo_viewable():
+            self.suggestion_frame.pack_forget()
+            
+    def on_suggestion_select(self, event=None):
+        """选择提示命令"""
+        selection = self.suggestion_listbox.curselection()
+        if selection:
+            selected_cmd = self.suggestion_listbox.get(selection[0])
+            self.cmd_var.set(selected_cmd + ' ')
+            self.cmd_entry.icursor(tk.END)
+            self.cmd_entry.focus_set()
+            self.hide_suggestions()
         
     def append_output(self, text):
         self.output_text.config(state=tk.NORMAL)
