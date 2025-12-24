@@ -1000,7 +1000,7 @@ tkinter GUI框架
             
             # 加载set数据
             if isinstance(value, (list, set)):
-                for val in value:
+                for val in sorted(value):  # 排序显示，便于查看
                     self.data_tree.insert('', tk.END, values=(val,))
         elif key_type == 'zset':
             columns = ('Score', 'Member')
