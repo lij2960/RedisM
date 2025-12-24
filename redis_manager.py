@@ -161,18 +161,49 @@ class RedisManager:
         
         ttk.Button(search_input_frame, text="🔍", command=self.search_keys, width=4).pack(side=tk.RIGHT, padx=(5, 0))
         
-        # 键树形列表
+        # 键树形列表 - 使用Text widget替代Treeview以支持水平滚动
         tree_frame = ttk.Frame(search_frame)
         tree_frame.pack(fill=tk.BOTH, expand=True)
         
-        self.keys_tree = ttk.Treeview(tree_frame)
-        self.keys_tree.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
-        self.keys_tree.bind('<<TreeviewSelect>>', self.on_key_select)
+        # 配置grid权重
+        tree_frame.grid_rowconfigure(0, weight=1)
+        tree_frame.grid_columnconfigure(0, weight=1)
         
-        # 滚动条
-        tree_scroll = ttk.Scrollbar(tree_frame, orient=tk.VERTICAL, command=self.keys_tree.yview)
-        tree_scroll.pack(side=tk.RIGHT, fill=tk.Y)
-        self.keys_tree.configure(yscrollcommand=tree_scroll.set)
+        # 使用Text widget显示键列表
+        self.keys_text = tk.Text(tree_frame, wrap=tk.NONE, font=('SF Pro Display', 11))
+        self.keys_text.grid(row=0, column=0, sticky='nsew')
+        self.keys_text.bind('<Button-1>', self.on_text_click)
+        self.keys_text.bind('<Double-Button-1>', self.on_text_double_click)
+        
+        # 垂直滚动条
+        v_scrollbar = ttk.Scrollbar(tree_frame, orient=tk.VERTICAL, command=self.keys_text.yview)
+        v_scrollbar.grid(row=0, column=1, sticky='ns')
+        self.keys_text.configure(yscrollcommand=v_scrollbar.set)
+        
+        # 水平滚动条
+        h_scrollbar = ttk.Scrollbar(tree_frame, orient=tk.HORIZONTAL, command=self.keys_text.xview)
+        h_scrollbar.grid(row=1, column=0, sticky='ew')
+        self.keys_text.configure(xscrollcommand=h_scrollbar.set)
+        
+        # 存储键数据和选中状态
+        self.keys_data = {}
+        self.group_data = {}  # 存储分组信息
+        self.expanded_groups = set()  # 跟踪展开的分组
+        self.selected_line = None
+        self.tree_structure = {}  # 存储完整的树结构
+        
+        # 配置文本标签样式
+        self.keys_text.tag_configure('selected', background='#007AFF', foreground='white')
+        self.keys_text.tag_configure('group', foreground='#666666', font=('SF Pro Display', 11, 'bold'))
+        self.keys_text.tag_configure('key', foreground='#333333')
+        self.keys_text.tag_configure('hover', background='#F0F0F0')
+        
+        # 绑定鼠标事件
+        self.keys_text.bind('<Motion>', self.on_mouse_motion)
+        self.keys_text.bind('<Leave>', self.on_mouse_leave)
+        self.keys_text.bind('<Enter>', self.on_mouse_enter)
+        self.current_hover_line = None
+        self.mouse_in_widget = False
         
     def setup_right_panel(self, parent):
         # 状态标签
@@ -196,6 +227,87 @@ class RedisManager:
         cli_frame = ttk.Frame(self.notebook, padding="15")
         self.notebook.add(cli_frame, text="💻 Command Line")
         self.setup_cli(cli_frame)
+        
+    def on_mouse_motion(self, event):
+        """处理鼠标移动事件"""
+        # 获取鼠标位置的行号
+        try:
+            line_num = int(self.keys_text.index(f"@{event.x},{event.y}").split('.')[0])
+            
+            # 清除之前的悬停效果
+            if self.current_hover_line and self.current_hover_line != self.selected_line:
+                self.keys_text.tag_remove('hover', f"{self.current_hover_line}.0", f"{self.current_hover_line}.end")
+            
+            # 检查是否是可点击的行（分组或键）
+            if line_num in self.group_data or line_num in self.keys_data:
+                self.keys_text.config(cursor="hand2")
+                # 添加悬停效果（但不覆盖选中效果）
+                if line_num != self.selected_line:
+                    self.keys_text.tag_add('hover', f"{line_num}.0", f"{line_num}.end")
+                self.current_hover_line = line_num
+            else:
+                self.keys_text.config(cursor="")
+                self.current_hover_line = None
+        except:
+            self.keys_text.config(cursor="")
+            self.current_hover_line = None
+    
+    def on_mouse_leave(self, event):
+        """处理鼠标离开事件"""
+        self.keys_text.config(cursor="")
+        if self.current_hover_line and self.current_hover_line != self.selected_line:
+            self.keys_text.tag_remove('hover', f"{self.current_hover_line}.0", f"{self.current_hover_line}.end")
+        self.current_hover_line = None
+        
+    def on_text_click(self, event):
+        """处理文本点击事件"""
+        # 获取点击的行号
+        line_num = int(self.keys_text.index(tk.CURRENT).split('.')[0])
+        
+        # 检查是否点击了分组
+        if line_num in self.group_data:
+            group_path = self.group_data[line_num]
+            
+            # 保存当前滚动位置
+            current_view = self.keys_text.yview()
+            
+            if group_path in self.expanded_groups:
+                # 收起时，同时收起所有子目录
+                self.expanded_groups.remove(group_path)
+                # 移除所有以该路径开头的子目录
+                to_remove = [path for path in self.expanded_groups if path.startswith(group_path + '/')]
+                for path in to_remove:
+                    self.expanded_groups.remove(path)
+            else:
+                self.expanded_groups.add(group_path)
+            
+            # 重新渲染树结构
+            self.render_tree_structure()
+            
+            # 恢复滚动位置以减少跳动
+            self.keys_text.yview_moveto(current_view[0])
+            
+        elif line_num in self.keys_data:
+            # 清除之前的选中效果
+            if self.selected_line:
+                self.keys_text.tag_remove('selected', f"{self.selected_line}.0", f"{self.selected_line}.end")
+            
+            # 选中当前行
+            self.selected_line = line_num
+            self.keys_text.tag_add('selected', f"{line_num}.0", f"{line_num}.end")
+            
+            # 加载键详情
+            key = self.keys_data[line_num]
+            self.load_key_details(key)
+        
+        # 清除悬停效果
+        if self.current_hover_line:
+            self.keys_text.tag_remove('hover', f"{self.current_hover_line}.0", f"{self.current_hover_line}.end")
+            self.current_hover_line = None
+        
+    def on_text_double_click(self, event):
+        """处理文本双击事件"""
+        self.on_text_click(event)
         
     def setup_key_manager(self, parent):
         self.key_details_frame = ttk.Frame(parent)
@@ -590,7 +702,8 @@ tkinter GUI框架
                 self.root.after(0, self.on_connect_success)
                 
             except Exception as e:
-                self.root.after(0, lambda: self.on_connect_error(str(e)))
+                error_msg = str(e)
+                self.root.after(0, lambda msg=error_msg: self.on_connect_error(msg))
         
         threading.Thread(target=connect_thread, daemon=True).start()
         
@@ -618,8 +731,11 @@ tkinter GUI框架
             self.disconnect_btn.config(state="disabled")
             
             # 清空键列表
-            for item in self.keys_tree.get_children():
-                self.keys_tree.delete(item)
+            self.keys_text.config(state='normal')
+            self.keys_text.delete('1.0', tk.END)
+            self.keys_text.config(state='disabled')
+            self.keys_data = {}
+            self.selected_line = None
             
             # 清空键详情
             for widget in self.key_details_frame.winfo_children():
@@ -876,22 +992,23 @@ tkinter GUI框架
             self.root.after(0, lambda: self.status_label.config(text=f"Failed to load keys: {error_msg}"))
         
     def update_keys_tree(self, keys):
-        # 清空树
-        for item in self.keys_tree.get_children():
-            self.keys_tree.delete(item)
+        # 清空文本
+        self.keys_text.config(state='normal')
+        self.keys_text.delete('1.0', tk.END)
             
         if not keys:
             self.status_label.config(text="No keys found")
+            self.keys_text.config(state='disabled')
             return
             
         # 按分隔符分组 - 支持多级结构
         separator = self.separator_var.get()
-        tree_structure = {}
+        self.tree_structure = {}
         
         for key in keys:
             if separator in key:
                 parts = key.split(separator)
-                current_level = tree_structure
+                current_level = self.tree_structure
                 
                 # 构建多级树结构
                 for i, part in enumerate(parts[:-1]):
@@ -907,51 +1024,130 @@ tkinter GUI框架
                     current_level[final_part]['_keys'].append(key)
                 else:
                     # 只有一个部分，直接作为键
-                    if '_keys' not in tree_structure:
-                        tree_structure['_keys'] = []
-                    tree_structure['_keys'].append(key)
+                    if '_keys' not in self.tree_structure:
+                        self.tree_structure['_keys'] = []
+                    self.tree_structure['_keys'].append(key)
             else:
-                if '_ungrouped' not in tree_structure:
-                    tree_structure['_ungrouped'] = {'_children': {}, '_keys': []}
-                tree_structure['_ungrouped']['_keys'].append(key)
+                if '_ungrouped' not in self.tree_structure:
+                    self.tree_structure['_ungrouped'] = {'_children': {}, '_keys': []}
+                self.tree_structure['_ungrouped']['_keys'].append(key)
         
-        # 递归添加到树中 - 默认收起状态
-        def add_tree_items(parent_id, structure, level=0):
+        # 渲染树结构
+        self.render_tree_structure()
+        
+        self.status_label.config(text=f"Found {len(keys)} keys" + 
+                                (f" (showing {len(keys)} of ~{self.total_keys_estimate} total)" 
+                                 if hasattr(self, 'total_keys_estimate') and self.total_keys_estimate and self.total_keys_estimate > len(keys) 
+                                 else ""))
+        
+    def render_tree_structure(self):
+        """渲染树结构显示"""
+        self.keys_text.config(state='normal')
+        self.keys_text.delete('1.0', tk.END)
+        
+        lines = []
+        self.keys_data = {}
+        self.group_data = {}
+        
+        def add_tree_items(structure, level=0, path_prefix=""):
             for name, data in structure.items():
                 if name.startswith('_'):
                     continue
                     
                 # 计算该分组的总键数
                 total_keys = self.count_keys_in_structure(data)
-                display_name = f"{name} ({total_keys})"
+                group_path = f"{path_prefix}/{name}" if path_prefix else name
                 
-                # 添加分组节点，默认收起 (open=False)
-                group_id = self.keys_tree.insert(parent_id, tk.END, text=display_name, open=False)
+                # 如果分组只有一个键且没有子分组，直接显示键
+                if total_keys == 1 and not data.get('_children') and data.get('_keys'):
+                    key = data['_keys'][0]
+                    indent = "    " * level
+                    key_line = f"{indent}🔑 {key}"
+                    lines.append(key_line)
+                    self.keys_data[len(lines)] = key
+                    continue
                 
-                # 递归添加子分组
-                if '_children' in data and data['_children']:
-                    add_tree_items(group_id, data['_children'], level + 1)
+                # 显示分组
+                indent = "    " * level
+                is_expanded = group_path in self.expanded_groups
+                expand_icon = "▼" if is_expanded else "▶"
+                display_name = f"{indent}{expand_icon} 📁 {name} ({total_keys})"
+                lines.append(display_name)
                 
-                # 添加该分组的键
-                if '_keys' in data and data['_keys']:
-                    for key in sorted(data['_keys']):
-                        self.keys_tree.insert(group_id, tk.END, text=key, values=(key,))
+                line_index = len(lines)
+                self.group_data[line_index] = group_path
+                
+                # 如果展开，显示子内容
+                if is_expanded:
+                    if '_children' in data and data['_children']:
+                        add_tree_items(data['_children'], level + 1, group_path)
+                    
+                    if '_keys' in data and data['_keys']:
+                        for i, key in enumerate(sorted(data['_keys'])):
+                            key_indent = "    " * (level + 1) + "  "
+                            is_last = i == len(data['_keys']) - 1 and not data.get('_children')
+                            connector = "└─" if is_last else "├─"
+                            key_line = f"{key_indent}{connector} 🔑 {key}"
+                            lines.append(key_line)
+                            self.keys_data[len(lines)] = key
         
         # 处理未分组的键
-        if '_ungrouped' in tree_structure:
-            ungrouped_keys = tree_structure['_ungrouped']['_keys']
+        if '_ungrouped' in self.tree_structure:
+            ungrouped_keys = self.tree_structure['_ungrouped']['_keys']
             if ungrouped_keys:
-                group_id = self.keys_tree.insert("", tk.END, text=f"ungrouped ({len(ungrouped_keys)})", open=False)
-                for key in sorted(ungrouped_keys):
-                    self.keys_tree.insert(group_id, tk.END, text=key, values=(key,))
+                # 如果只有一个未分组的键，直接显示
+                if len(ungrouped_keys) == 1:
+                    key = ungrouped_keys[0]
+                    key_line = f"🔑 {key}"
+                    lines.append(key_line)
+                    self.keys_data[len(lines)] = key
+                else:
+                    group_path = "_ungrouped"
+                    is_expanded = group_path in self.expanded_groups
+                    expand_icon = "▼" if is_expanded else "▶"
+                    display_name = f"{expand_icon} 📁 ungrouped ({len(ungrouped_keys)})"
+                    lines.append(display_name)
+                    line_index = len(lines)
+                    self.group_data[line_index] = group_path
+                    
+                    if is_expanded:
+                        for i, key in enumerate(sorted(ungrouped_keys)):
+                            is_last = i == len(ungrouped_keys) - 1
+                            connector = "└─" if is_last else "├─"
+                            key_line = f"      {connector} 🔑 {key}"
+                            lines.append(key_line)
+                            self.keys_data[len(lines)] = key
         
         # 添加分组的键
-        add_tree_items("", tree_structure)
+        add_tree_items(self.tree_structure)
         
-        self.status_label.config(text=f"Found {len(keys)} keys" + 
-                                (f" (showing {len(keys)} of ~{self.total_keys_estimate} total)" 
-                                 if hasattr(self, 'total_keys_estimate') and self.total_keys_estimate and self.total_keys_estimate > len(keys) 
-                                 else ""))
+        # 显示文本并应用样式
+        self.keys_text.insert('1.0', '\n'.join(lines))
+        
+        # 为不同类型的行应用样式
+        for line_num in range(1, len(lines) + 1):
+            if line_num in self.group_data:
+                self.keys_text.tag_add('group', f"{line_num}.0", f"{line_num}.end")
+            elif line_num in self.keys_data:
+                self.keys_text.tag_add('key', f"{line_num}.0", f"{line_num}.end")
+        
+        self.keys_text.config(state='disabled')
+        
+    def get_group_data_by_path(self, group_path):
+        """根据路径获取分组数据"""
+        if group_path == "_ungrouped":
+            return self.tree_structure.get('_ungrouped')
+        
+        parts = group_path.split('/')
+        current = self.tree_structure
+        
+        for part in parts:
+            if part in current:
+                current = current[part]
+            else:
+                return None
+        
+        return current
         
     def count_keys_in_structure(self, structure):
         """递归计算结构中的键总数"""
@@ -962,6 +1158,108 @@ tkinter GUI框架
             for child in structure['_children'].values():
                 count += self.count_keys_in_structure(child)
         return count
+        
+    def on_mouse_motion(self, event):
+        """处理鼠标移动事件"""
+        try:
+            line_num = int(self.keys_text.index(f"@{event.x},{event.y}").split('.')[0])
+            
+            # 如果鼠标还在同一行，不做任何处理
+            if line_num == self.current_hover_line:
+                return
+            
+            # 清除之前的悬停效果
+            if self.current_hover_line and self.current_hover_line != self.selected_line:
+                self.keys_text.tag_remove('hover', f"{self.current_hover_line}.0", f"{self.current_hover_line}.end")
+            
+            # 检查是否是可点击的行（分组或键）
+            if line_num in self.group_data or line_num in self.keys_data:
+                self.keys_text.config(cursor="hand2")
+                if line_num != self.selected_line:
+                    self.keys_text.tag_add('hover', f"{line_num}.0", f"{line_num}.end")
+                self.current_hover_line = line_num
+            else:
+                self.keys_text.config(cursor="")
+                self.current_hover_line = None
+        except (ValueError, tk.TclError):
+            self.keys_text.config(cursor="")
+            self.current_hover_line = None
+    
+    def on_mouse_enter(self, event):
+        """处理鼠标进入事件"""
+        self.mouse_in_widget = True
+    
+    def on_mouse_leave(self, event):
+        """处理鼠标离开事件"""
+        self.mouse_in_widget = False
+        self.keys_text.config(cursor="")
+        if self.current_hover_line and self.current_hover_line != self.selected_line:
+            self.keys_text.tag_remove('hover', f"{self.current_hover_line}.0", f"{self.current_hover_line}.end")
+        self.current_hover_line = None
+        
+    def on_text_click(self, event):
+        """处理文本点击事件"""
+        # 确保鼠标在widget内才处理点击
+        if not getattr(self, 'mouse_in_widget', True):
+            return
+            
+        try:
+            line_num = int(self.keys_text.index(tk.CURRENT).split('.')[0])
+        except (ValueError, tk.TclError):
+            return
+        
+        # 检查是否点击了分组
+        if line_num in self.group_data:
+            group_path = self.group_data[line_num]
+            current_view = self.keys_text.yview()
+            
+            # 检查是否为只有一个key的最后一层分组
+            if group_path in self.expanded_groups:
+                # 收起时，同时收起所有子目录
+                self.expanded_groups.remove(group_path)
+                to_remove = [path for path in self.expanded_groups if path.startswith(group_path + '/')]
+                for path in to_remove:
+                    self.expanded_groups.remove(path)
+            else:
+                self.expanded_groups.add(group_path)
+                # 检查是否为只有一个key的分组，如果是则直接选中该key
+                group_data = self.get_group_data_by_path(group_path)
+                if group_data and len(group_data.get('_keys', [])) == 1 and not group_data.get('_children'):
+                    key = group_data['_keys'][0]
+                    # 重新渲染后查找该key的行号
+                    self.render_tree_structure()
+                    for line, k in self.keys_data.items():
+                        if k == key:
+                            if self.selected_line:
+                                self.keys_text.tag_remove('selected', f"{self.selected_line}.0", f"{self.selected_line}.end")
+                            self.selected_line = line
+                            self.keys_text.tag_add('selected', f"{line}.0", f"{line}.end")
+                            self.load_key_details(key)
+                            break
+                    self.keys_text.yview_moveto(current_view[0])
+                    return
+            
+            self.render_tree_structure()
+            self.keys_text.yview_moveto(current_view[0])
+            
+        elif line_num in self.keys_data:
+            if self.selected_line:
+                self.keys_text.tag_remove('selected', f"{self.selected_line}.0", f"{self.selected_line}.end")
+            
+            self.selected_line = line_num
+            self.keys_text.tag_add('selected', f"{line_num}.0", f"{line_num}.end")
+            
+            key = self.keys_data[line_num]
+            self.load_key_details(key)
+        
+        # 清除悬停效果
+        if self.current_hover_line:
+            self.keys_text.tag_remove('hover', f"{self.current_hover_line}.0", f"{self.current_hover_line}.end")
+            self.current_hover_line = None
+        
+    def on_text_double_click(self, event):
+        """处理文本双击事件"""
+        self.on_text_click(event)
         
     def on_key_select(self, event):
         selection = self.keys_tree.selection()
