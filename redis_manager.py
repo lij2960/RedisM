@@ -1442,12 +1442,21 @@ tkinter GUI框架
             ttk.Button(query_frame, text="Find", 
                       command=lambda: self.filter_hash_data(key)).pack(side=tk.RIGHT)
         elif key_type in ['list', 'zset']:
-            ttk.Label(query_frame, text="Index/Range:").pack(side=tk.LEFT)
-            self.struct_query_var = tk.StringVar(value="0 -1")
+            ttk.Label(query_frame, text="Filter:").pack(side=tk.LEFT)
+            self.struct_query_var = tk.StringVar()
             query_entry = ttk.Entry(query_frame, textvariable=self.struct_query_var)
             query_entry.pack(side=tk.LEFT, fill=tk.X, expand=True, padx=(5, 5))
-            ttk.Button(query_frame, text="Get Range", 
-                      command=lambda: self.query_list_range(key, key_type)).pack(side=tk.RIGHT)
+            query_entry.bind('<Return>', lambda e: self.filter_list_zset_data(key, key_type))
+            ttk.Button(query_frame, text="Find", 
+                      command=lambda: self.filter_list_zset_data(key, key_type)).pack(side=tk.RIGHT)
+        elif key_type == 'set':
+            ttk.Label(query_frame, text="Filter:").pack(side=tk.LEFT)
+            self.struct_query_var = tk.StringVar()
+            query_entry = ttk.Entry(query_frame, textvariable=self.struct_query_var)
+            query_entry.pack(side=tk.LEFT, fill=tk.X, expand=True, padx=(5, 5))
+            query_entry.bind('<Return>', lambda e: self.filter_set_data(key))
+            ttk.Button(query_frame, text="Find", 
+                      command=lambda: self.filter_set_data(key)).pack(side=tk.RIGHT)
         
         # 表格显示
         table_frame = ttk.Frame(parent)
@@ -1494,10 +1503,11 @@ tkinter GUI框架
             self.data_tree.column('Index', width=80, minwidth=60)
             self.data_tree.column('Value', width=400, minwidth=200)
             
+            # 存储原始list数据以便过滤
+            self.original_list_data = value if isinstance(value, list) else []
+            
             # 加载list数据
-            if isinstance(value, list):
-                for i, val in enumerate(value):
-                    self.data_tree.insert('', tk.END, values=(i, val))
+            self.load_list_data_to_tree(self.original_list_data)
         elif key_type == 'set':
             columns = ('Value',)
             self.data_tree = ttk.Treeview(table_frame, columns=columns, show='headings', style=style_name)
@@ -1506,10 +1516,11 @@ tkinter GUI框架
             # 设置列宽
             self.data_tree.column('Value', width=400, minwidth=200)
             
+            # 存储原始set数据以便过滤
+            self.original_set_data = list(value) if isinstance(value, (list, set)) else []
+            
             # 加载set数据
-            if isinstance(value, (list, set)):
-                for val in sorted(value):  # 排序显示，便于查看
-                    self.data_tree.insert('', tk.END, values=(val,))
+            self.load_set_data_to_tree(self.original_set_data)
         elif key_type == 'zset':
             columns = ('Score', 'Member')
             self.data_tree = ttk.Treeview(table_frame, columns=columns, show='headings', style=style_name)
@@ -1520,11 +1531,11 @@ tkinter GUI框架
             self.data_tree.column('Score', width=100, minwidth=80)
             self.data_tree.column('Member', width=300, minwidth=200)
             
+            # 存储原始zset数据以便过滤
+            self.original_zset_data = value if isinstance(value, list) else []
+            
             # 加载zset数据
-            if isinstance(value, list):
-                for i in range(0, len(value), 2):
-                    if i + 1 < len(value):
-                        self.data_tree.insert('', tk.END, values=(value[i+1], value[i]))
+            self.load_zset_data_to_tree(self.original_zset_data)
         
         self.data_tree.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
         
@@ -1730,6 +1741,7 @@ tkinter GUI框架
         if not filter_text:
             # 如果过滤文本为空，显示所有数据
             self.load_hash_data_to_tree(self.original_hash_data)
+            self._update_filter_status(len(self.original_hash_data), len(self.original_hash_data), filter_text)
             return
         
         try:
@@ -1747,25 +1759,143 @@ tkinter GUI框架
             
             # 更新显示
             self.load_hash_data_to_tree(filtered_data)
-            
-            # 显示过滤结果统计
-            total_count = len(self.original_hash_data)
-            filtered_count = len(filtered_data)
-            
-            if hasattr(self, 'filter_status_label'):
-                self.filter_status_label.destroy()
-            
-            # 在表格下方显示过滤状态
-            parent_frame = self.data_tree.master.master  # 获取包含表格的父框架
-            self.filter_status_label = ttk.Label(parent_frame, 
-                                                text=f"Showing {filtered_count} of {total_count} items" + 
-                                                     (f" (filtered by: '{filter_text}')" if filter_text else ""),
-                                                font=('SF Pro Display', 9),
-                                                foreground='#666666')
-            self.filter_status_label.pack(pady=(5, 0))
+            self._update_filter_status(len(filtered_data), len(self.original_hash_data), filter_text)
             
         except Exception as e:
             messagebox.showerror("Filter Error", f"Failed to filter hash data: {e}")
+    
+    def load_list_data_to_tree(self, list_data):
+        """将list数据加载到树形控件"""
+        # 清空现有数据
+        for item in self.data_tree.get_children():
+            self.data_tree.delete(item)
+        
+        # 加载数据
+        if isinstance(list_data, list):
+            for i, val in enumerate(list_data):
+                self.data_tree.insert('', tk.END, values=(i, val))
+    
+    def load_set_data_to_tree(self, set_data):
+        """将set数据加载到树形控件"""
+        # 清空现有数据
+        for item in self.data_tree.get_children():
+            self.data_tree.delete(item)
+        
+        # 加载数据
+        if isinstance(set_data, list):
+            for val in sorted(set_data):  # 排序显示，便于查看
+                self.data_tree.insert('', tk.END, values=(val,))
+    
+    def load_zset_data_to_tree(self, zset_data):
+        """将zset数据加载到树形控件"""
+        # 清空现有数据
+        for item in self.data_tree.get_children():
+            self.data_tree.delete(item)
+        
+        # 加载数据
+        if isinstance(zset_data, list):
+            for i in range(0, len(zset_data), 2):
+                if i + 1 < len(zset_data):
+                    self.data_tree.insert('', tk.END, values=(zset_data[i+1], zset_data[i]))
+    
+    def filter_list_zset_data(self, key, key_type):
+        """过滤list和zset数据"""
+        filter_text = self.struct_query_var.get().strip()
+        
+        try:
+            if key_type == 'list':
+                if not filter_text:
+                    # 如果过滤文本为空，显示所有数据
+                    self.load_list_data_to_tree(self.original_list_data)
+                    self._update_filter_status(len(self.original_list_data), len(self.original_list_data), filter_text)
+                    return
+                
+                # 过滤数据 - 支持值的模糊匹配
+                filtered_data = []
+                filter_lower = filter_text.lower()
+                
+                for val in self.original_list_data:
+                    value_str = str(val).lower()
+                    if filter_lower in value_str:
+                        filtered_data.append(val)
+                
+                # 更新显示
+                self.load_list_data_to_tree(filtered_data)
+                self._update_filter_status(len(filtered_data), len(self.original_list_data), filter_text)
+                
+            elif key_type == 'zset':
+                if not filter_text:
+                    # 如果过滤文本为空，显示所有数据
+                    self.load_zset_data_to_tree(self.original_zset_data)
+                    total_count = len(self.original_zset_data) // 2
+                    self._update_filter_status(total_count, total_count, filter_text)
+                    return
+                
+                # 过滤数据 - 支持成员名和分数的模糊匹配
+                filtered_data = []
+                filter_lower = filter_text.lower()
+                
+                for i in range(0, len(self.original_zset_data), 2):
+                    if i + 1 < len(self.original_zset_data):
+                        member = self.original_zset_data[i]
+                        score = self.original_zset_data[i + 1]
+                        
+                        member_str = str(member).lower()
+                        score_str = str(score).lower()
+                        
+                        if filter_lower in member_str or filter_lower in score_str:
+                            filtered_data.extend([member, score])
+                
+                # 更新显示
+                self.load_zset_data_to_tree(filtered_data)
+                filtered_count = len(filtered_data) // 2
+                total_count = len(self.original_zset_data) // 2
+                self._update_filter_status(filtered_count, total_count, filter_text)
+                
+        except Exception as e:
+            messagebox.showerror("Filter Error", f"Failed to filter {key_type} data: {e}")
+    
+    def filter_set_data(self, key):
+        """过滤set数据"""
+        filter_text = self.struct_query_var.get().strip()
+        
+        if not filter_text:
+            # 如果过滤文本为空，显示所有数据
+            self.load_set_data_to_tree(self.original_set_data)
+            self._update_filter_status(len(self.original_set_data), len(self.original_set_data), filter_text)
+            return
+        
+        try:
+            # 过滤数据 - 支持值的模糊匹配
+            filtered_data = []
+            filter_lower = filter_text.lower()
+            
+            for val in self.original_set_data:
+                value_str = str(val).lower()
+                if filter_lower in value_str:
+                    filtered_data.append(val)
+            
+            # 更新显示
+            self.load_set_data_to_tree(filtered_data)
+            self._update_filter_status(len(filtered_data), len(self.original_set_data), filter_text)
+            
+        except Exception as e:
+            messagebox.showerror("Filter Error", f"Failed to filter set data: {e}")
+    
+    def _update_filter_status(self, filtered_count, total_count, filter_text):
+        """更新过滤状态显示"""
+        # 清理之前的状态标签
+        if hasattr(self, 'filter_status_label'):
+            self.filter_status_label.destroy()
+        
+        # 在表格下方显示过滤状态
+        parent_frame = self.data_tree.master.master  # 获取包含表格的父框架
+        self.filter_status_label = ttk.Label(parent_frame, 
+                                            text=f"Showing {filtered_count} of {total_count} items" + 
+                                                 (f" (filtered by: '{filter_text}')" if filter_text else ""),
+                                            font=('SF Pro Display', 9),
+                                            foreground='#666666')
+        self.filter_status_label.pack(pady=(5, 0))
     
     def on_treeview_motion(self, event):
         """处理Treeview鼠标移动事件，实现悬停效果"""
