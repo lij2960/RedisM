@@ -1567,9 +1567,126 @@ tkinter GUI框架
             return
         try:
             result = self.redis_client.hget(key, field)
-            self.show_query_result({field: result})
+            if result is not None:
+                # 使用与双击一致的编辑对话框
+                self.show_hash_field_dialog(key, field, result)
+            else:
+                messagebox.showinfo("Query Result", f"Field '{field}' not found in hash '{key}'")
         except Exception as e:
             messagebox.showerror("Query Error", f"Failed to get hash field: {e}")
+    
+    def show_hash_field_dialog(self, key, field, value):
+        """显示hash字段查看/编辑对话框，与双击行为一致"""
+        dialog = tk.Toplevel(self.root)
+        dialog.title(f"Hash Field: {field}")
+        dialog.geometry("900x700")
+        dialog.transient(self.root)
+        dialog.grab_set()
+        
+        # 创建滚动框架
+        canvas = tk.Canvas(dialog)
+        scrollbar = ttk.Scrollbar(dialog, orient="vertical", command=canvas.yview)
+        scrollable_frame = ttk.Frame(canvas)
+        
+        scrollable_frame.bind(
+            "<Configure>",
+            lambda e: canvas.configure(scrollregion=canvas.bbox("all"))
+        )
+        
+        canvas.create_window((0, 0), window=scrollable_frame, anchor="nw")
+        canvas.configure(yscrollcommand=scrollbar.set)
+        
+        # 绑定鼠标滚轮事件
+        def _on_mousewheel(event):
+            canvas.yview_scroll(int(-1*(event.delta/120)), "units")
+        
+        canvas.bind_all("<MouseWheel>", _on_mousewheel)
+        
+        canvas.pack(side="left", fill="both", expand=True)
+        scrollbar.pack(side="right", fill="y")
+        
+        # Field显示（只读）
+        field_frame = ttk.LabelFrame(scrollable_frame, text="Field (Key)")
+        field_frame.pack(fill=tk.X, padx=10, pady=(10, 5))
+        
+        field_label = ttk.Label(field_frame, text=field, font=('SF Pro Display', 11, 'bold'))
+        field_label.pack(fill=tk.X, padx=5, pady=5)
+        
+        # Value编辑
+        value_frame = ttk.LabelFrame(scrollable_frame, text="Value")
+        value_frame.pack(fill=tk.BOTH, expand=True, padx=10, pady=5)
+        
+        # JSON格式化按钮
+        json_btn_frame = ttk.Frame(value_frame)
+        json_btn_frame.pack(fill=tk.X, padx=5, pady=5)
+        
+        def format_json():
+            try:
+                import json
+                current_value = value_text.get(1.0, tk.END).strip()
+                parsed = json.loads(current_value)
+                formatted = json.dumps(parsed, indent=2, ensure_ascii=False)
+                value_text.delete(1.0, tk.END)
+                value_text.insert(1.0, formatted)
+            except json.JSONDecodeError:
+                messagebox.showerror("JSON Error", "Invalid JSON format")
+            except Exception as e:
+                messagebox.showerror("Error", f"Failed to format JSON: {e}")
+        
+        def minify_json():
+            try:
+                import json
+                current_value = value_text.get(1.0, tk.END).strip()
+                parsed = json.loads(current_value)
+                minified = json.dumps(parsed, separators=(',', ':'), ensure_ascii=False)
+                value_text.delete(1.0, tk.END)
+                value_text.insert(1.0, minified)
+            except json.JSONDecodeError:
+                messagebox.showerror("JSON Error", "Invalid JSON format")
+            except Exception as e:
+                messagebox.showerror("Error", f"Failed to minify JSON: {e}")
+        
+        ttk.Button(json_btn_frame, text="Format JSON", command=format_json).pack(side=tk.LEFT, padx=(0, 5))
+        ttk.Button(json_btn_frame, text="Minify JSON", command=minify_json).pack(side=tk.LEFT)
+        
+        # 文本编辑器
+        text_frame = ttk.Frame(value_frame)
+        text_frame.pack(fill=tk.BOTH, expand=True, padx=5, pady=5)
+        
+        value_text = tk.Text(text_frame, wrap=tk.WORD, height=20, width=80)
+        value_text.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
+        value_text.insert(tk.END, str(value))
+        
+        text_scroll = ttk.Scrollbar(text_frame, orient=tk.VERTICAL, command=value_text.yview)
+        text_scroll.pack(side=tk.RIGHT, fill=tk.Y)
+        value_text.configure(yscrollcommand=text_scroll.set)
+        
+        # 按钮
+        btn_frame = ttk.Frame(scrollable_frame)
+        btn_frame.pack(fill=tk.X, padx=10, pady=10)
+        
+        def save_changes():
+            new_value = value_text.get(1.0, tk.END).strip()
+            try:
+                # 更新Redis中的值
+                self.redis_client.hset(key, field, new_value)
+                messagebox.showinfo("Success", f"Hash field '{field}' updated successfully!")
+                canvas.unbind_all("<MouseWheel>")
+                dialog.destroy()
+                # 刷新key详情显示
+                self.load_key_details(key)
+            except Exception as e:
+                messagebox.showerror("Error", f"Failed to update hash field: {e}")
+        
+        def cancel_dialog():
+            canvas.unbind_all("<MouseWheel>")
+            dialog.destroy()
+        
+        ttk.Button(btn_frame, text="Save", command=save_changes).pack(side=tk.RIGHT, padx=(5, 0))
+        ttk.Button(btn_frame, text="Cancel", command=cancel_dialog).pack(side=tk.RIGHT)
+        
+        # 设置焦点到value文本框
+        value_text.focus_set()
             
     def query_list_range(self, key, key_type):
         """查询list/zset范围"""
@@ -2003,53 +2120,114 @@ tkinter GUI框架
             return
             
         try:
+            # 如果查询内容就是key本身，直接重新加载key详情
+            if query == key:
+                self.load_key_details(key)
+                return
+            
+            # 解析查询命令
+            parts = query.split()
+            if not parts:
+                return
+                
+            cmd = parts[0].upper()
+            
             if key_type == 'hash':
-                if query.startswith('HGET'):
-                    # HGET key field
-                    parts = query.split()
-                    if len(parts) >= 3:
-                        field = parts[2]
+                if cmd == 'HGET' and len(parts) >= 2:
+                    # HGET field 或 HGET key field
+                    if len(parts) == 2:
+                        # 只有field，使用当前key
+                        field = parts[1]
                         result = self.redis_client.hget(key, field)
-                        self.show_query_result(result)
-                elif query.startswith('HKEYS'):
+                    else:
+                        # 完整的HGET key field命令
+                        field = parts[2]
+                        result = self.redis_client.hget(parts[1], field)
+                    self.show_query_result({field: result})
+                elif cmd == 'HKEYS':
                     result = self.redis_client.hkeys(key)
                     self.show_query_result(result)
-                elif query.startswith('HVALS'):
+                elif cmd == 'HVALS':
                     result = self.redis_client.hvals(key)
+                    self.show_query_result(result)
+                elif cmd == 'HGETALL':
+                    result = self.redis_client.hgetall(key)
+                    self.show_query_result(result)
+                else:
+                    # 直接执行命令，如果没有指定key则使用当前key
+                    if len(parts) == 1 and cmd in ['HKEYS', 'HVALS', 'HGETALL', 'HLEN']:
+                        result = self.redis_client.execute_command(cmd, key)
+                    else:
+                        result = self.redis_client.execute_command(cmd, *parts[1:])
+                    self.show_query_result(result)
+            elif key_type == 'list':
+                if cmd == 'LRANGE' and len(parts) >= 3:
+                    start = int(parts[1])
+                    end = int(parts[2])
+                    result = self.redis_client.lrange(key, start, end)
+                    self.show_query_result(result)
+                elif cmd == 'LLEN':
+                    result = self.redis_client.llen(key)
+                    self.show_query_result(result)
+                elif cmd == 'LINDEX' and len(parts) >= 2:
+                    index = int(parts[1])
+                    result = self.redis_client.lindex(key, index)
                     self.show_query_result(result)
                 else:
                     # 直接执行命令
-                    parts = query.split()
-                    if len(parts) > 0:
-                        cmd = parts[0].upper()
-                        args = [key] + parts[1:]
-                        result = self.redis_client.execute_command(cmd, *args)
-                        self.show_query_result(result)
-            elif key_type == 'list':
-                if query.startswith('LRANGE'):
-                    parts = query.split()
-                    start = int(parts[1]) if len(parts) > 1 else 0
-                    end = int(parts[2]) if len(parts) > 2 else -1
-                    result = self.redis_client.lrange(key, start, end)
-                    self.show_query_result(result)
-                else:
-                    parts = query.split()
-                    if len(parts) > 0:
-                        cmd = parts[0].upper()
-                        args = [key] + parts[1:]
-                        result = self.redis_client.execute_command(cmd, *args)
-                        self.show_query_result(result)
-            else:
-                # 其他类型的通用查询
-                parts = query.split()
-                if len(parts) > 0:
-                    cmd = parts[0].upper()
-                    if cmd in ['GET', 'TYPE', 'TTL', 'EXISTS']:
+                    if len(parts) == 1 and cmd in ['LLEN']:
                         result = self.redis_client.execute_command(cmd, key)
                     else:
                         args = [key] + parts[1:]
                         result = self.redis_client.execute_command(cmd, *args)
                     self.show_query_result(result)
+            elif key_type == 'set':
+                if cmd == 'SMEMBERS':
+                    result = self.redis_client.smembers(key)
+                    self.show_query_result(list(result))
+                elif cmd == 'SCARD':
+                    result = self.redis_client.scard(key)
+                    self.show_query_result(result)
+                elif cmd == 'SISMEMBER' and len(parts) >= 2:
+                    member = parts[1]
+                    result = self.redis_client.sismember(key, member)
+                    self.show_query_result(result)
+                else:
+                    if len(parts) == 1 and cmd in ['SMEMBERS', 'SCARD']:
+                        result = self.redis_client.execute_command(cmd, key)
+                    else:
+                        args = [key] + parts[1:]
+                        result = self.redis_client.execute_command(cmd, *args)
+                    self.show_query_result(result)
+            elif key_type == 'zset':
+                if cmd == 'ZRANGE' and len(parts) >= 3:
+                    start = int(parts[1])
+                    end = int(parts[2])
+                    withscores = len(parts) > 3 and parts[3].upper() == 'WITHSCORES'
+                    result = self.redis_client.zrange(key, start, end, withscores=withscores)
+                    self.show_query_result(result)
+                elif cmd == 'ZCARD':
+                    result = self.redis_client.zcard(key)
+                    self.show_query_result(result)
+                elif cmd == 'ZSCORE' and len(parts) >= 2:
+                    member = parts[1]
+                    result = self.redis_client.zscore(key, member)
+                    self.show_query_result(result)
+                else:
+                    if len(parts) == 1 and cmd in ['ZCARD']:
+                        result = self.redis_client.execute_command(cmd, key)
+                    else:
+                        args = [key] + parts[1:]
+                        result = self.redis_client.execute_command(cmd, *args)
+                    self.show_query_result(result)
+            else:
+                # 其他类型的通用查询
+                if cmd in ['GET', 'TYPE', 'TTL', 'EXISTS']:
+                    result = self.redis_client.execute_command(cmd, key)
+                else:
+                    args = [key] + parts[1:]
+                    result = self.redis_client.execute_command(cmd, *args)
+                self.show_query_result(result)
                     
         except Exception as e:
             messagebox.showerror("Query Error", f"Failed to execute query: {e}")
