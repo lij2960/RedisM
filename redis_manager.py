@@ -348,6 +348,11 @@ tkinter GUI框架
         fields['max_keys'] = ttk.Entry(scrollable_frame)
         fields['max_keys'].pack(fill=tk.X, padx=10, pady=(0, 10))
         
+        # 数据库数量配置
+        ttk.Label(scrollable_frame, text="Number of Databases (1-128):").pack(anchor=tk.W, padx=10)
+        fields['db_count'] = ttk.Entry(scrollable_frame)
+        fields['db_count'].pack(fill=tk.X, padx=10, pady=(0, 10))
+        
         # SSH选项
         ssh_var = tk.BooleanVar()
         ssh_check = ttk.Checkbutton(scrollable_frame, text="Use SSH Tunnel", variable=ssh_var)
@@ -441,6 +446,7 @@ tkinter GUI框架
             fields['username'].insert(0, conn.get('username', ''))
             fields['password'].insert(0, conn.get('password', ''))
             fields['max_keys'].insert(0, str(conn.get('max_keys', 0)))
+            fields['db_count'].insert(0, str(conn.get('db_count', 16)))
             ssh_var.set(conn.get('use_ssh', False))
             fields['ssh_host'].insert(0, conn.get('ssh_host', ''))
             fields['ssh_port'].insert(0, str(conn.get('ssh_port', 22)))
@@ -458,6 +464,7 @@ tkinter GUI框架
             fields['host'].insert(0, 'localhost')
             fields['port'].insert(0, '6379')
             fields['max_keys'].insert(0, '0')
+            fields['db_count'].insert(0, '16')
             fields['ssh_port'].insert(0, '22')
         
         # 按钮
@@ -466,6 +473,11 @@ tkinter GUI框架
         
         def save_connection():
             try:
+                db_count = int(fields['db_count'].get() or 16)
+                if db_count < 1 or db_count > 128:
+                    messagebox.showerror("Error", "Database count must be between 1 and 128")
+                    return
+                    
                 new_conn = {
                     'name': fields['name'].get(),
                     'host': fields['host'].get(),
@@ -473,6 +485,7 @@ tkinter GUI框架
                     'username': fields['username'].get(),
                     'password': fields['password'].get(),
                     'max_keys': int(fields['max_keys'].get() or 0),
+                    'db_count': db_count,
                     'use_ssh': ssh_var.get(),
                     'ssh_host': fields['ssh_host'].get(),
                     'ssh_port': int(fields['ssh_port'].get() or 22),
@@ -745,7 +758,8 @@ tkinter GUI框架
         messagebox.showerror("Connection Error", error)
         
     def update_db_list(self):
-        self.db_combo['values'] = [f"DB {i}" for i in range(16)]
+        db_count = self.current_conn.get('db_count', 16)
+        self.db_combo['values'] = [f"DB {i}" for i in range(db_count)]
         self.db_var.set("DB 0")
         
     def on_db_change(self, event):
