@@ -1424,6 +1424,11 @@ tkinter GUI框架
         
     def show_structured_value(self, parent, key, key_type, value):
         """显示结构化数据（表格形式）"""
+        # 清理之前的过滤状态标签
+        if hasattr(self, 'filter_status_label'):
+            self.filter_status_label.destroy()
+            delattr(self, 'filter_status_label')
+        
         # 查询框架
         query_frame = ttk.Frame(parent)
         query_frame.pack(fill=tk.X, padx=5, pady=5)
@@ -1433,8 +1438,9 @@ tkinter GUI框架
             self.struct_query_var = tk.StringVar()
             query_entry = ttk.Entry(query_frame, textvariable=self.struct_query_var)
             query_entry.pack(side=tk.LEFT, fill=tk.X, expand=True, padx=(5, 5))
-            ttk.Button(query_frame, text="Get Value", 
-                      command=lambda: self.query_hash_field(key)).pack(side=tk.RIGHT)
+            query_entry.bind('<Return>', lambda e: self.filter_hash_data(key))
+            ttk.Button(query_frame, text="Find", 
+                      command=lambda: self.filter_hash_data(key)).pack(side=tk.RIGHT)
         elif key_type in ['list', 'zset']:
             ttk.Label(query_frame, text="Index/Range:").pack(side=tk.LEFT)
             self.struct_query_var = tk.StringVar(value="0 -1")
@@ -1473,10 +1479,11 @@ tkinter GUI框架
             self.data_tree.column('Field', width=150, minwidth=100)
             self.data_tree.column('Value', width=300, minwidth=200)
             
+            # 存储原始hash数据以便过滤
+            self.original_hash_data = value if isinstance(value, dict) else {}
+            
             # 加载hash数据
-            if isinstance(value, dict):
-                for field, val in value.items():
-                    self.data_tree.insert('', tk.END, values=(field, val))
+            self.load_hash_data_to_tree(self.original_hash_data)
         elif key_type == 'list':
             columns = ('Index', 'Value')
             self.data_tree = ttk.Treeview(table_frame, columns=columns, show='headings', style=style_name)
@@ -1705,6 +1712,61 @@ tkinter GUI框架
         except Exception as e:
             messagebox.showerror("Query Error", f"Failed to get range: {e}")
             
+    def load_hash_data_to_tree(self, hash_data):
+        """将hash数据加载到树形控件"""
+        # 清空现有数据
+        for item in self.data_tree.get_children():
+            self.data_tree.delete(item)
+        
+        # 加载数据
+        if isinstance(hash_data, dict):
+            for field, val in hash_data.items():
+                self.data_tree.insert('', tk.END, values=(field, val))
+    
+    def filter_hash_data(self, key):
+        """过滤hash数据"""
+        filter_text = self.struct_query_var.get().strip()
+        
+        if not filter_text:
+            # 如果过滤文本为空，显示所有数据
+            self.load_hash_data_to_tree(self.original_hash_data)
+            return
+        
+        try:
+            # 过滤数据 - 支持字段名和值的模糊匹配
+            filtered_data = {}
+            filter_lower = filter_text.lower()
+            
+            for field, value in self.original_hash_data.items():
+                field_str = str(field).lower()
+                value_str = str(value).lower()
+                
+                # 如果字段名或值包含过滤文本，则包含该项
+                if filter_lower in field_str or filter_lower in value_str:
+                    filtered_data[field] = value
+            
+            # 更新显示
+            self.load_hash_data_to_tree(filtered_data)
+            
+            # 显示过滤结果统计
+            total_count = len(self.original_hash_data)
+            filtered_count = len(filtered_data)
+            
+            if hasattr(self, 'filter_status_label'):
+                self.filter_status_label.destroy()
+            
+            # 在表格下方显示过滤状态
+            parent_frame = self.data_tree.master.master  # 获取包含表格的父框架
+            self.filter_status_label = ttk.Label(parent_frame, 
+                                                text=f"Showing {filtered_count} of {total_count} items" + 
+                                                     (f" (filtered by: '{filter_text}')" if filter_text else ""),
+                                                font=('SF Pro Display', 9),
+                                                foreground='#666666')
+            self.filter_status_label.pack(pady=(5, 0))
+            
+        except Exception as e:
+            messagebox.showerror("Filter Error", f"Failed to filter hash data: {e}")
+    
     def on_treeview_motion(self, event):
         """处理Treeview鼠标移动事件，实现悬停效果"""
         try:
