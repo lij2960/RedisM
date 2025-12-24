@@ -22,8 +22,12 @@ class RedisManager:
         self.root.title(f"{__app_name__} v{__version__}")
         self.root.geometry("1600x1000")
         
+        # 设置应用图标和样式
+        self.setup_styles()
+        
         self.connections = []
         self.current_conn = None
+        self.current_conn_index = -1  # 跟踪当前连接的索引
         self.redis_client = None
         self.ssh_client = None
         self.ssh_tunnel = None
@@ -32,6 +36,27 @@ class RedisManager:
         
         self.setup_ui()
         self.load_connections()
+        
+    def setup_styles(self):
+        """设置应用样式"""
+        style = ttk.Style()
+        
+        # 设置主题
+        try:
+            style.theme_use('aqua')  # macOS原生主题
+        except:
+            style.theme_use('clam')  # 备用主题
+        
+        # 自定义样式
+        style.configure('Title.TLabel', font=('SF Pro Display', 14, 'bold'))
+        style.configure('Heading.TLabel', font=('SF Pro Display', 12, 'bold'))
+        style.configure('Connected.TLabel', foreground='#007AFF', font=('SF Pro Display', 10, 'bold'))
+        
+        # 连接列表样式
+        style.configure('Connected.TFrame', relief='solid', borderwidth=1)
+        
+        # 设置窗口背景色
+        self.root.configure(bg='#F2F2F7')
         
     def setup_ui(self):
         # 创建菜单栏
@@ -44,12 +69,13 @@ class RedisManager:
         help_menu.add_command(label="About", command=self.show_about)
         
         # 创建主框架
-        main_frame = ttk.Frame(self.root)
-        main_frame.pack(fill=tk.BOTH, expand=True, padx=10, pady=10)
+        main_frame = ttk.Frame(self.root, padding="15")
+        main_frame.pack(fill=tk.BOTH, expand=True)
         
         # 左侧面板
-        left_frame = ttk.Frame(main_frame)
-        left_frame.pack(side=tk.LEFT, fill=tk.BOTH, padx=(0, 10))
+        left_frame = ttk.Frame(main_frame, width=350)
+        left_frame.pack(side=tk.LEFT, fill=tk.Y, padx=(0, 15))
+        left_frame.pack_propagate(False)
         
         # 右侧面板
         right_frame = ttk.Frame(main_frame)
@@ -60,61 +86,84 @@ class RedisManager:
         
     def setup_left_panel(self, parent):
         # 连接管理
-        conn_frame = ttk.LabelFrame(parent, text="Connections")
-        conn_frame.pack(fill=tk.BOTH, pady=(0, 10))
+        conn_frame = ttk.LabelFrame(parent, text="🔗 Connections", padding="10")
+        conn_frame.pack(fill=tk.X, pady=(0, 15))
+        
+        # 连接列表框架
+        list_frame = ttk.Frame(conn_frame)
+        list_frame.pack(fill=tk.X, pady=(0, 10))
         
         # 连接列表
-        self.conn_listbox = tk.Listbox(conn_frame, height=6)
-        self.conn_listbox.pack(fill=tk.BOTH, padx=5, pady=5)
+        self.conn_listbox = tk.Listbox(list_frame, height=6, font=('SF Pro Display', 11),
+                                      selectbackground='#007AFF', selectforeground='white',
+                                      relief='flat', borderwidth=0, highlightthickness=1,
+                                      highlightcolor='#007AFF')
+        self.conn_listbox.pack(fill=tk.X)
         self.conn_listbox.bind('<<ListboxSelect>>', self.on_connection_select)
         self.conn_listbox.bind('<Double-1>', self.on_connection_double_click)
         
         # 连接按钮
         btn_frame = ttk.Frame(conn_frame)
-        btn_frame.pack(fill=tk.X, padx=5, pady=5)
+        btn_frame.pack(fill=tk.X)
         
-        ttk.Button(btn_frame, text="Add", command=self.add_connection).pack(side=tk.LEFT, padx=(0, 5))
-        ttk.Button(btn_frame, text="Edit", command=self.edit_connection).pack(side=tk.LEFT, padx=(0, 5))
-        ttk.Button(btn_frame, text="Delete", command=self.delete_connection).pack(side=tk.LEFT, padx=(0, 5))
-        ttk.Button(btn_frame, text="Connect", command=self.connect_redis).pack(side=tk.LEFT, padx=(0, 5))
+        # 第一行按钮
+        btn_row1 = ttk.Frame(btn_frame)
+        btn_row1.pack(fill=tk.X, pady=(0, 5))
+        
+        ttk.Button(btn_row1, text="➕ Add", command=self.add_connection, width=8).pack(side=tk.LEFT, padx=(0, 5))
+        ttk.Button(btn_row1, text="✏️ Edit", command=self.edit_connection, width=8).pack(side=tk.LEFT, padx=(0, 5))
+        ttk.Button(btn_row1, text="🗑️ Delete", command=self.delete_connection, width=8).pack(side=tk.LEFT)
+        
+        # 第二行按钮
+        btn_row2 = ttk.Frame(btn_frame)
+        btn_row2.pack(fill=tk.X)
+        
+        self.connect_btn = ttk.Button(btn_row2, text="🔌 Connect", command=self.connect_redis)
+        self.connect_btn.pack(side=tk.LEFT, fill=tk.X, expand=True, padx=(0, 5))
+        
+        self.disconnect_btn = ttk.Button(btn_row2, text="🔌 Disconnect", command=self.disconnect_redis, state="disabled")
+        self.disconnect_btn.pack(side=tk.RIGHT)
         
         # 数据库选择
-        db_frame = ttk.LabelFrame(parent, text="Database")
-        db_frame.pack(fill=tk.X, pady=(0, 10))
+        db_frame = ttk.LabelFrame(parent, text="🗄️ Database", padding="10")
+        db_frame.pack(fill=tk.X, pady=(0, 15))
         
         self.db_var = tk.StringVar()
-        self.db_combo = ttk.Combobox(db_frame, textvariable=self.db_var, state="readonly")
+        self.db_combo = ttk.Combobox(db_frame, textvariable=self.db_var, state="readonly",
+                                    font=('SF Pro Display', 11))
         self.db_combo['values'] = [f"DB {i}" for i in range(16)]
-        self.db_combo.pack(fill=tk.X, padx=5, pady=5)
+        self.db_combo.pack(fill=tk.X)
         self.db_combo.bind('<<ComboboxSelected>>', self.on_db_change)
         
         # 键搜索
-        search_frame = ttk.LabelFrame(parent, text="Keys")
+        search_frame = ttk.LabelFrame(parent, text="🔍 Keys", padding="10")
         search_frame.pack(fill=tk.BOTH, expand=True)
         
         # 分隔符设置
         sep_frame = ttk.Frame(search_frame)
-        sep_frame.pack(fill=tk.X, padx=5, pady=5)
-        ttk.Label(sep_frame, text="Separator:").pack(side=tk.LEFT)
+        sep_frame.pack(fill=tk.X, pady=(0, 10))
+        ttk.Label(sep_frame, text="Separator:", font=('SF Pro Display', 10)).pack(side=tk.LEFT)
         self.separator_var = tk.StringVar(value=":")
-        sep_entry = ttk.Entry(sep_frame, textvariable=self.separator_var, width=5)
+        sep_entry = ttk.Entry(sep_frame, textvariable=self.separator_var, width=5,
+                             font=('SF Pro Display', 10))
         sep_entry.pack(side=tk.LEFT, padx=(5, 0))
         sep_entry.bind('<KeyRelease>', self.on_separator_change)
         
         # 搜索框
         search_input_frame = ttk.Frame(search_frame)
-        search_input_frame.pack(fill=tk.X, padx=5, pady=5)
+        search_input_frame.pack(fill=tk.X, pady=(0, 10))
         
         self.search_var = tk.StringVar()
-        search_entry = ttk.Entry(search_input_frame, textvariable=self.search_var)
+        search_entry = ttk.Entry(search_input_frame, textvariable=self.search_var,
+                                font=('SF Pro Display', 11))
         search_entry.pack(side=tk.LEFT, fill=tk.X, expand=True)
         search_entry.bind('<Return>', lambda e: self.search_keys())
         
-        ttk.Button(search_input_frame, text="Search", command=self.search_keys).pack(side=tk.RIGHT, padx=(5, 0))
+        ttk.Button(search_input_frame, text="🔍", command=self.search_keys, width=4).pack(side=tk.RIGHT, padx=(5, 0))
         
         # 键树形列表
         tree_frame = ttk.Frame(search_frame)
-        tree_frame.pack(fill=tk.BOTH, expand=True, padx=5, pady=5)
+        tree_frame.pack(fill=tk.BOTH, expand=True)
         
         self.keys_tree = ttk.Treeview(tree_frame)
         self.keys_tree.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
@@ -127,54 +176,70 @@ class RedisManager:
         
     def setup_right_panel(self, parent):
         # 状态标签
-        self.status_label = ttk.Label(parent, text="Select a connection")
-        self.status_label.pack(fill=tk.X, pady=(0, 10))
+        status_frame = ttk.Frame(parent)
+        status_frame.pack(fill=tk.X, pady=(0, 15))
+        
+        self.status_label = ttk.Label(status_frame, text="🔌 Select a connection to get started", 
+                                     style='Title.TLabel')
+        self.status_label.pack(anchor=tk.W)
         
         # 标签页
         self.notebook = ttk.Notebook(parent)
         self.notebook.pack(fill=tk.BOTH, expand=True)
         
         # 键管理标签页
-        key_frame = ttk.Frame(self.notebook)
-        self.notebook.add(key_frame, text="Key Manager")
+        key_frame = ttk.Frame(self.notebook, padding="15")
+        self.notebook.add(key_frame, text="🔑 Key Manager")
         self.setup_key_manager(key_frame)
         
         # 命令行标签页
-        cli_frame = ttk.Frame(self.notebook)
-        self.notebook.add(cli_frame, text="Command Line")
+        cli_frame = ttk.Frame(self.notebook, padding="15")
+        self.notebook.add(cli_frame, text="💻 Command Line")
         self.setup_cli(cli_frame)
         
     def setup_key_manager(self, parent):
         self.key_details_frame = ttk.Frame(parent)
         self.key_details_frame.pack(fill=tk.BOTH, expand=True)
         
-        ttk.Label(self.key_details_frame, text="Select a key to view details").pack(pady=20)
+        # 初始提示
+        welcome_frame = ttk.Frame(self.key_details_frame)
+        welcome_frame.pack(expand=True)
+        
+        ttk.Label(welcome_frame, text="🔑", font=('SF Pro Display', 48)).pack(pady=(0, 10))
+        ttk.Label(welcome_frame, text="Select a key to view details", 
+                 style='Title.TLabel').pack()
         
     def setup_cli(self, parent):
         # 命令输入
-        cmd_input_frame = ttk.Frame(parent)
-        cmd_input_frame.pack(fill=tk.X, padx=5, pady=5)
+        cmd_input_frame = ttk.LabelFrame(parent, text="⌨️ Command Input", padding="10")
+        cmd_input_frame.pack(fill=tk.X, pady=(0, 15))
         
-        ttk.Label(cmd_input_frame, text="Command:").pack(side=tk.LEFT)
+        input_frame = ttk.Frame(cmd_input_frame)
+        input_frame.pack(fill=tk.X)
+        
+        ttk.Label(input_frame, text="redis>", font=('SF Pro Display', 11, 'bold')).pack(side=tk.LEFT, padx=(0, 5))
         self.cmd_var = tk.StringVar()
-        cmd_entry = ttk.Entry(cmd_input_frame, textvariable=self.cmd_var)
-        cmd_entry.pack(side=tk.LEFT, fill=tk.X, expand=True, padx=(5, 5))
+        cmd_entry = ttk.Entry(input_frame, textvariable=self.cmd_var, font=('Menlo', 11))
+        cmd_entry.pack(side=tk.LEFT, fill=tk.X, expand=True, padx=(0, 10))
         cmd_entry.bind('<Return>', lambda e: self.execute_command())
         
-        ttk.Button(cmd_input_frame, text="Execute", command=self.execute_command).pack(side=tk.RIGHT, padx=(0, 5))
-        ttk.Button(cmd_input_frame, text="Clear", command=self.clear_output).pack(side=tk.RIGHT)
+        btn_frame = ttk.Frame(input_frame)
+        btn_frame.pack(side=tk.RIGHT)
         
-        # 输出区域 - 占据剩余所有空间
-        output_frame = ttk.Frame(parent)
-        output_frame.pack(fill=tk.BOTH, expand=True, padx=5, pady=5)
+        ttk.Button(btn_frame, text="▶️ Execute", command=self.execute_command).pack(side=tk.LEFT, padx=(0, 5))
+        ttk.Button(btn_frame, text="🗑️ Clear", command=self.clear_output).pack(side=tk.LEFT)
         
-        ttk.Label(output_frame, text="Output:").pack(anchor=tk.W)
+        # 输出区域
+        output_frame = ttk.LabelFrame(parent, text="📊 Output", padding="10")
+        output_frame.pack(fill=tk.BOTH, expand=True)
         
         # 文本框和滚动条
         text_frame = ttk.Frame(output_frame)
         text_frame.pack(fill=tk.BOTH, expand=True)
         
-        self.output_text = tk.Text(text_frame, state=tk.DISABLED, wrap=tk.WORD)
+        self.output_text = tk.Text(text_frame, state=tk.DISABLED, wrap=tk.WORD,
+                                  font=('Menlo', 10), bg='#1E1E1E', fg='#FFFFFF',
+                                  insertbackground='#FFFFFF', selectbackground='#007AFF')
         self.output_text.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
         
         output_scroll = ttk.Scrollbar(text_frame, orient=tk.VERTICAL, command=self.output_text.yview)
@@ -452,6 +517,7 @@ tkinter GUI框架
         selection = self.conn_listbox.curselection()
         if selection:
             self.current_conn = self.connections[selection[0]]
+            # 不更新current_conn_index，只有在成功连接后才更新
             
     def on_connection_double_click(self, event):
         self.connect_redis()
@@ -495,6 +561,48 @@ tkinter GUI框架
                 self.root.after(0, lambda: self.on_connect_error(str(e)))
         
         threading.Thread(target=connect_thread, daemon=True).start()
+        
+    def disconnect_redis(self):
+        """断开Redis连接"""
+        try:
+            self.stop_keepalive()
+            
+            if self.redis_client:
+                self.redis_client.close()
+                self.redis_client = None
+            
+            if self.ssh_tunnel:
+                self.ssh_tunnel.close()
+                self.ssh_tunnel = None
+                
+            if self.ssh_client:
+                self.ssh_client.close()
+                self.ssh_client = None
+            
+            # 重置UI状态
+            self.current_conn_index = -1
+            self.status_label.config(text="🔌 Disconnected")
+            self.connect_btn.config(text="🔌 Connect", state="normal")
+            self.disconnect_btn.config(state="disabled")
+            
+            # 清空键列表
+            for item in self.keys_tree.get_children():
+                self.keys_tree.delete(item)
+            
+            # 清空键详情
+            for widget in self.key_details_frame.winfo_children():
+                widget.destroy()
+            
+            welcome_frame = ttk.Frame(self.key_details_frame)
+            welcome_frame.pack(expand=True)
+            ttk.Label(welcome_frame, text="🔑", font=('SF Pro Display', 48)).pack(pady=(0, 10))
+            ttk.Label(welcome_frame, text="Select a key to view details", style='Title.TLabel').pack()
+            
+            # 更新连接列表显示
+            self.refresh_connection_list()
+            
+        except Exception as e:
+            messagebox.showerror("Disconnect Error", f"Error while disconnecting: {e}")
         
     def setup_ssh_tunnel(self):
         ssh_config = self.current_conn
@@ -614,13 +722,26 @@ tkinter GUI框架
             return s.getsockname()[1]
             
     def on_connect_success(self):
-        self.status_label.config(text=f"Connected to {self.current_conn['name']}")
+        # 更新当前连接索引
+        selection = self.conn_listbox.curselection()
+        if selection:
+            self.current_conn_index = selection[0]
+        
+        self.status_label.config(text=f"✅ Connected to {self.current_conn['name']}")
+        self.connect_btn.config(text="✅ Connected", state="disabled")
+        self.disconnect_btn.config(state="normal")
+        
+        # 更新连接列表显示
+        self.refresh_connection_list()
+        
         self.update_db_list()
         self.search_keys()
         self.start_keepalive()
         
     def on_connect_error(self, error):
-        self.status_label.config(text=f"Connection failed: {error}")
+        self.status_label.config(text=f"❌ Connection failed: {error}")
+        self.connect_btn.config(text="🔌 Connect", state="normal")
+        self.disconnect_btn.config(state="disabled")
         messagebox.showerror("Connection Error", error)
         
     def update_db_list(self):
@@ -1642,8 +1763,13 @@ tkinter GUI框架
             
     def refresh_connection_list(self):
         self.conn_listbox.delete(0, tk.END)
-        for conn in self.connections:
-            self.conn_listbox.insert(tk.END, conn['name'])
+        for i, conn in enumerate(self.connections):
+            # 标记当前连接
+            if i == self.current_conn_index and self.redis_client:
+                display_name = f"✅ {conn['name']} (Connected)"
+            else:
+                display_name = conn['name']
+            self.conn_listbox.insert(tk.END, display_name)
             
     def save_connections(self):
         config_path = Path.home() / ".redis_manager_config.json"
@@ -1670,6 +1796,10 @@ tkinter GUI框架
     def on_closing(self):
         self.save_connections()
         self.stop_keepalive()
+        
+        # 重置连接状态
+        self.current_conn_index = -1
+        
         if self.ssh_tunnel:
             self.ssh_tunnel.close()
         if self.ssh_client:
