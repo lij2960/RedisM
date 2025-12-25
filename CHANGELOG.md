@@ -1,91 +1,64 @@
-# RedisM 更新日志
+# Changelog
 
-## v1.0.0 (2024-12-25)
+All notable changes to RedisM will be documented in this file.
 
-### 🎉 重大功能发布
+The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
+and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-#### ⚡ 实时操作系统
-- **Add Item 实时添加**: 点击添加直接写入Redis，无需Update All
-- **Edit 实时编辑**: 双击编辑即时保存到Redis
-- **三层数据同步**: Redis数据库 ↔ 原始数据缓存 ↔ UI显示
-- **智能刷新**: 保持过滤状态的同时更新显示
+## [1.0.0] - 2024-12-25
 
-#### 🔍 全类型过滤系统
-- **Hash过滤**: 支持字段名和值的模糊匹配
-- **List过滤**: 支持列表值的模糊搜索
-- **Set过滤**: 支持集合成员的模糊匹配
-- **ZSet过滤**: 支持成员名和分数的双重匹配
-- **实时过滤**: Find按钮替代Get Value，即时显示结果
+### Added
+- **Connection Management**: Multiple Redis connection configurations with save/load functionality
+- **SSH Tunnel Support**: Full SSH tunnel support with password and private key authentication
+- **Connection Testing**: Test connections before saving with detailed feedback
+- **Modern Connection Dialog**: Enhanced UI with unified SSH authentication layout
+- **Real-time Operations**: Direct Redis operations without requiring batch updates
+- **Advanced Filtering**: Filter functionality for all Redis data types (Hash, List, Set, ZSet)
+- **Hierarchical Key View**: Tree-like display of keys with customizable separators
+- **Built-in CLI**: Redis command line interface with auto-completion
+- **Data Type Support**: Full support for String, List, Set, Hash, and ZSet operations
+- **JSON Editor**: Built-in JSON formatting and editing for Hash values
+- **Streaming Key Loading**: Efficient loading of up to 100,000 keys
+- **Connection Keepalive**: Automatic connection maintenance
+- **Native macOS UI**: Modern interface following macOS design guidelines
 
-#### 🎨 界面体验优化
-- **行间距增加**: 从20px增加到28px，提升可读性
-- **悬停效果**: 鼠标移动到行上时显示浅蓝色背景
-- **选中状态**: 深蓝色背景突出当前选择
-- **列宽优化**: 为不同数据类型设置合适的列宽
+### Enhanced
+- **UI Improvements**: Better spacing, hover effects, and visual hierarchy
+- **Data Integrity**: Maintains hidden data when filtering is active
+- **Error Handling**: Comprehensive error handling with user-friendly messages
+- **Performance**: Optimized for large datasets with streaming operations
+- **User Experience**: Intuitive navigation and immediate visual feedback
 
-#### 🔧 功能修复和改进
-- **Query按钮修复**: 
-  - 支持直接查询key本身
-  - 扩展Redis命令支持（HGETALL, LLEN, SMEMBERS等）
-  - 改进命令解析逻辑
-- **Hash查询一致性**: Get Value按钮使用与双击一致的编辑对话框
-- **Update All数据完整性**: 过滤状态下不再丢失隐藏数据
+### Fixed
+- **Query Button Logic**: Improved query execution and Hash field queries
+- **Update All Functionality**: Preserves filtered data during batch updates
+- **SSH Authentication**: Reliable switching between password and key authentication
+- **Connection Dialog**: Consistent layout and field validation
+- **Default Values**: Proper handling of default values in connection forms
 
-### 🛠️ 技术改进
-
-#### 数据管理
-- **原始数据存储**: 为所有数据类型缓存原始数据
-- **智能合并**: 过滤状态下的数据合并策略
-- **批量操作**: 使用Redis批量命令提高性能
-- **错误处理**: 完善的异常处理和用户反馈
-
-#### 用户体验
-- **即时反馈**: 每个操作都有成功/失败提示
-- **状态保持**: 操作后保持过滤和选择状态
-- **操作简化**: 减少对Update All按钮的依赖
-- **一致性**: 所有数据类型使用统一的操作方式
-
-#### 性能优化
-- **最小化操作**: 只更新变更的部分
-- **智能刷新**: 避免全量数据重新加载
-- **内存管理**: 高效的缓存管理策略
-
-### 📚 文档完善
-- **功能文档**: 详细的功能说明和技术实现
-- **用户指南**: 完整的使用说明和故障排除
-- **开发文档**: 代码结构和扩展指南
-- **更新日志**: 详细的版本变更记录
-
-### 🗂️ 项目整理
-- **代码清理**: 删除临时验证文件和重复代码
-- **文档组织**: 将功能文档整理到docs目录
-- **结构优化**: 清晰的项目结构和文件组织
-
-## 功能对比
-
-| 功能 | v0.x | v1.0.0 | 改进 |
-|------|------|--------|------|
-| 添加数据 | Add → Update All | Add → 即时生效 | 步骤减少50% |
-| 编辑数据 | Edit → Update All | Edit → 即时生效 | 步骤减少50% |
-| 数据过滤 | 不支持 | 全类型支持 | 全新功能 |
-| 界面体验 | 基础 | 现代化 | 大幅提升 |
-| 数据完整性 | 有风险 | 完全保证 | 重要修复 |
-| 操作反馈 | 有限 | 即时友好 | 体验优化 |
-
-## 升级建议
-
-### 从旧版本升级
-1. 备份现有连接配置
-2. 安装新版本
-3. 导入连接配置
-4. 体验新功能
-
-### 新用户
-1. 直接安装v1.0.0
-2. 阅读用户指南
-3. 查看功能文档
-4. 开始使用
+### Technical
+- **Code Organization**: Clean, modular codebase with comprehensive documentation
+- **Build System**: Automated macOS app building with PyInstaller
+- **Dependencies**: Minimal dependencies with robust error handling
+- **Documentation**: Comprehensive feature documentation and user guides
 
 ---
 
-**RedisM v1.0.0** - 全面升级，让Redis管理更简单、更高效！
+## Development Notes
+
+### Architecture
+- **Single File Application**: All functionality consolidated in `redis_manager.py`
+- **Configuration Management**: Centralized config in `config.py`
+- **Build Automation**: Streamlined build process with `build_python.sh`
+
+### Removed in 1.0.0
+- Unused `connection_manager.py` and `key_manager.py` modules
+- Test files and development utilities
+- Redundant build configurations
+
+### Future Roadmap
+- Multi-platform support (Windows, Linux)
+- Plugin system for custom data types
+- Advanced query builder
+- Data export/import functionality
+- Performance monitoring and analytics

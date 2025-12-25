@@ -1,65 +1,71 @@
-# RedisM 功能文档
+# RedisM Documentation
 
-本目录包含 RedisM 各项功能的详细说明文档。
+This directory contains detailed documentation for RedisM features and implementation details.
 
-## 📚 文档索引
+## 📚 Feature Documentation
 
-### 🎨 界面和用户体验
-- [**UI界面改进**](UI_IMPROVEMENTS.md) - 界面优化、行间距、悬停效果等用户体验改进
+### Core Features
+- [**UI Improvements**](UI_IMPROVEMENTS.md) - Interface enhancements and user experience improvements
+- [**Connection Dialog Improvements**](CONNECTION_DIALOG_IMPROVEMENTS.md) - Modern connection configuration interface
+- [**Real-time Operations**](REALTIME_OPERATIONS.md) - Direct Redis operations without batch updates
 
-### 🔍 过滤和搜索功能
-- [**Hash过滤功能**](HASH_FILTER_FEATURE.md) - Hash类型数据的过滤搜索功能
-- [**全类型过滤功能**](ALL_TYPES_FILTER_FEATURE.md) - List、Set、ZSet、Hash所有类型的统一过滤功能
+### Data Management
+- [**Hash Filter Feature**](HASH_FILTER_FEATURE.md) - Filtering functionality for Hash data types
+- [**All Types Filter Feature**](ALL_TYPES_FILTER_FEATURE.md) - Comprehensive filtering for all Redis data types
+- [**Query Fixes**](QUERY_FIXES.md) - Query button improvements and Hash field queries
+- [**Update All Fix**](UPDATE_ALL_FIX.md) - Data integrity preservation during batch operations
 
-### 🔧 功能修复和改进
-- [**查询功能修复**](QUERY_FIXES.md) - Query按钮逻辑修复和Hash字段查询改进
-- [**Update All修复**](UPDATE_ALL_FIX.md) - 批量更新功能在过滤状态下的数据完整性修复
+## 🎯 Quick Navigation
 
-### ⚡ 实时操作
-- [**实时操作功能**](REALTIME_OPERATIONS.md) - 添加、编辑操作直接作用于Redis的实时功能
+### For Users
+- **Getting Started**: See main [README.md](../README.md)
+- **Connection Setup**: [Connection Dialog Improvements](CONNECTION_DIALOG_IMPROVEMENTS.md)
+- **Data Operations**: [Real-time Operations](REALTIME_OPERATIONS.md)
+- **Filtering Data**: [All Types Filter Feature](ALL_TYPES_FILTER_FEATURE.md)
 
-## 🚀 功能特性概览
+### For Developers
+- **UI Architecture**: [UI Improvements](UI_IMPROVEMENTS.md)
+- **Data Management**: [Update All Fix](UPDATE_ALL_FIX.md)
+- **Query System**: [Query Fixes](QUERY_FIXES.md)
+- **Feature Implementation**: Individual feature documents
 
-### 核心改进
-1. **实时操作** - 添加和编辑操作直接作用于Redis，无需批量更新
-2. **智能过滤** - 所有数据类型支持实时过滤和模糊搜索
-3. **界面优化** - 增加行间距、悬停效果，提升用户体验
-4. **数据完整性** - 确保过滤状态下的数据不会丢失
+## 📖 Document Structure
 
-### 技术亮点
-- **三层数据同步** - Redis、缓存、UI的一致性保证
-- **状态保持** - 操作后保持过滤和选择状态
-- **错误处理** - 完善的异常处理和用户反馈
-- **性能优化** - 最小化Redis操作，智能刷新策略
+Each feature document follows this structure:
+- **Overview**: What the feature does
+- **Implementation**: Technical details
+- **User Experience**: How it improves usability
+- **Code Examples**: Relevant code snippets
+- **Testing**: How to verify the feature works
 
-## 📖 阅读建议
+## 🔄 Document Status
 
-### 新用户
-建议按以下顺序阅读：
-1. [UI界面改进](UI_IMPROVEMENTS.md) - 了解界面特性
-2. [全类型过滤功能](ALL_TYPES_FILTER_FEATURE.md) - 掌握过滤搜索
-3. [实时操作功能](REALTIME_OPERATIONS.md) - 学习高效操作方式
+| Document | Status | Last Updated |
+|----------|--------|--------------|
+| UI_IMPROVEMENTS.md | ✅ Complete | 2024-12-25 |
+| CONNECTION_DIALOG_IMPROVEMENTS.md | ✅ Complete | 2024-12-25 |
+| REALTIME_OPERATIONS.md | ✅ Complete | 2024-12-25 |
+| ALL_TYPES_FILTER_FEATURE.md | ✅ Complete | 2024-12-25 |
+| HASH_FILTER_FEATURE.md | ✅ Complete | 2024-12-25 |
+| QUERY_FIXES.md | ✅ Complete | 2024-12-25 |
+| UPDATE_ALL_FIX.md | ✅ Complete | 2024-12-25 |
 
-### 开发者
-建议重点关注：
-1. [实时操作功能](REALTIME_OPERATIONS.md) - 了解技术实现
-2. [Update All修复](UPDATE_ALL_FIX.md) - 数据一致性保证
-3. [查询功能修复](QUERY_FIXES.md) - 功能改进细节
+## 🤝 Contributing to Documentation
 
-### 问题排查
-如遇到问题，可参考：
-1. [Update All修复](UPDATE_ALL_FIX.md) - 数据丢失问题
-2. [查询功能修复](QUERY_FIXES.md) - 查询相关问题
-3. 主README的故障排除章节
+When adding new features or making changes:
 
-## 🔄 版本历史
+1. **Create Feature Document**: Document new features in detail
+2. **Update Existing Docs**: Keep related documents current
+3. **Add Code Examples**: Include relevant code snippets
+4. **Update This Index**: Add new documents to the navigation
 
-所有功能改进都在 v1.0.0 版本中实现，包括：
-- UI界面优化
-- 过滤搜索功能
-- 实时操作功能
-- 各种bug修复和改进
+### Documentation Guidelines
+- Use clear, concise language
+- Include code examples where helpful
+- Explain both what and why
+- Keep documents focused on single features
+- Update the status table when making changes
 
 ---
 
-如有疑问或建议，欢迎提交Issue或Pull Request！
+**Note**: These documents provide detailed technical information about RedisM's features. For general usage instructions, see the main [README.md](../README.md) file.

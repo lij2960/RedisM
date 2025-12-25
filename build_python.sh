@@ -59,8 +59,6 @@ pyinstaller --onedir --windowed \
     --osx-bundle-identifier="com.redismanager.app" \
     --target-arch=x86_64 \
     --hidden-import=config \
-    --hidden-import=connection_manager \
-    --hidden-import=key_manager \
     "$PYTHON_SCRIPT"
 
 # 检查构建结果
