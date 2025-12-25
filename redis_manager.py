@@ -1941,22 +1941,58 @@ tkinter GUI框架
         
         if key_type == 'hash':
             field, value = values[0], values[1]
-            self.show_hash_edit_dialog(field, value, selection[0])
+            self.show_hash_edit_dialog(key, field, value, selection[0])
         elif key_type == 'list':
-            index, value = values[0], values[1]
+            index, value = int(values[0]), values[1]
             new_value = simpledialog.askstring("Edit List Value", f"Index: {index}\nEnter new value:", initialvalue=value)
             if new_value is not None:
-                self.data_tree.item(selection[0], values=(index, new_value))
+                try:
+                    # 直接更新Redis
+                    self.redis_client.lset(key, index, new_value)
+                    # 更新原始数据
+                    if hasattr(self, 'original_list_data') and 0 <= index < len(self.original_list_data):
+                        self.original_list_data[index] = new_value
+                    # 更新UI
+                    self.data_tree.item(selection[0], values=(index, new_value))
+                    messagebox.showinfo("Success", "List item updated successfully!")
+                except Exception as e:
+                    messagebox.showerror("Error", f"Failed to update list item: {e}")
         elif key_type == 'set':
             old_value = values[0]
-            self.show_set_edit_dialog(old_value, selection[0])
+            self.show_set_edit_dialog(key, old_value, selection[0])
         elif key_type == 'zset':
-            score, member = values[0], values[1]
+            score, member = float(values[0]), values[1]
             new_member = simpledialog.askstring("Edit ZSet Member", f"Score: {score}\nEnter new member:", initialvalue=member)
             if new_member is not None:
-                new_score = simpledialog.askstring("Edit ZSet Score", f"Member: {new_member}\nEnter new score:", initialvalue=str(score))
-                if new_score is not None:
-                    self.data_tree.item(selection[0], values=(new_score, new_member))
+                new_score_str = simpledialog.askstring("Edit ZSet Score", f"Member: {new_member}\nEnter new score:", initialvalue=str(score))
+                if new_score_str is not None:
+                    try:
+                        new_score = float(new_score_str)
+                        
+                        # 如果成员名改变了，删除旧成员
+                        if member != new_member:
+                            self.redis_client.zrem(key, member)
+                        
+                        # 添加/更新新成员
+                        self.redis_client.zadd(key, {new_member: new_score})
+                        
+                        # 更新原始数据
+                        if hasattr(self, 'original_zset_data'):
+                            # 找到并更新原始数据中的项目
+                            for i in range(0, len(self.original_zset_data), 2):
+                                if i < len(self.original_zset_data) and self.original_zset_data[i] == member:
+                                    self.original_zset_data[i] = new_member
+                                    self.original_zset_data[i + 1] = new_score
+                                    break
+                        
+                        # 更新UI
+                        self.data_tree.item(selection[0], values=(new_score, new_member))
+                        
+                        messagebox.showinfo("Success", "ZSet member updated successfully!")
+                    except ValueError:
+                        messagebox.showerror("Error", "Score must be a valid number")
+                    except Exception as e:
+                        messagebox.showerror("Error", f"Failed to update zset member: {e}")
     def start_keepalive(self):
         """启动Redis连接保活"""
         self.keepalive_running = True
@@ -1977,7 +2013,7 @@ tkinter GUI框架
         """停止Redis连接保活"""
         self.keepalive_running = False
         
-    def show_hash_edit_dialog(self, field, value, tree_item):
+    def show_hash_edit_dialog(self, key, field, value, tree_item):
         """显示hash编辑对话框，支持同时编辑key和value，并支持JSON格式化"""
         dialog = tk.Toplevel(self.root)
         dialog.title("Edit Hash Field")
@@ -2076,8 +2112,28 @@ tkinter GUI框架
                 messagebox.showerror("Error", "Field name cannot be empty")
                 return
             
-            # 更新树表项
-            self.data_tree.item(tree_item, values=(new_field, new_value))
+            try:
+                # 如果字段名改变了，需要删除旧字段
+                if field and field != new_field:
+                    self.redis_client.hdel(key, field)
+                
+                # 设置新字段值
+                self.redis_client.hset(key, new_field, new_value)
+                
+                # 更新原始数据
+                if hasattr(self, 'original_hash_data'):
+                    if field and field != new_field and field in self.original_hash_data:
+                        del self.original_hash_data[field]
+                    self.original_hash_data[new_field] = new_value
+                
+                # 更新UI
+                self.data_tree.item(tree_item, values=(new_field, new_value))
+                
+                messagebox.showinfo("Success", "Hash field updated successfully!")
+                canvas.unbind_all("<MouseWheel>")
+                dialog.destroy()
+            except Exception as e:
+                messagebox.showerror("Error", f"Failed to update hash field: {e}")
             canvas.unbind_all("<MouseWheel>")
             dialog.destroy()
         
@@ -2092,7 +2148,7 @@ tkinter GUI框架
         field_entry.focus_set()
         field_entry.select_range(0, tk.END)
         
-    def show_set_edit_dialog(self, value, tree_item):
+    def show_set_edit_dialog(self, key, old_value, tree_item):
         """显示set编辑对话框，支持JSON格式化"""
         dialog = tk.Toplevel(self.root)
         dialog.title("Edit Set Value")
@@ -2143,7 +2199,7 @@ tkinter GUI框架
         
         value_text = tk.Text(text_frame, wrap=tk.WORD, height=15)
         value_text.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
-        value_text.insert(tk.END, str(value))
+        value_text.insert(tk.END, str(old_value))
         
         text_scroll = ttk.Scrollbar(text_frame, orient=tk.VERTICAL, command=value_text.yview)
         text_scroll.pack(side=tk.RIGHT, fill=tk.Y)
@@ -2155,8 +2211,28 @@ tkinter GUI框架
         
         def save_changes():
             new_value = value_text.get(1.0, tk.END).strip()
-            self.data_tree.item(tree_item, values=(new_value,))
-            dialog.destroy()
+            if new_value != old_value:
+                try:
+                    # 删除旧值，添加新值
+                    self.redis_client.srem(key, old_value)
+                    result = self.redis_client.sadd(key, new_value)
+                    
+                    # 更新原始数据
+                    if hasattr(self, 'original_set_data'):
+                        if old_value in self.original_set_data:
+                            self.original_set_data.remove(old_value)
+                        if new_value not in self.original_set_data:
+                            self.original_set_data.append(new_value)
+                    
+                    # 更新UI
+                    self.data_tree.item(tree_item, values=(new_value,))
+                    
+                    messagebox.showinfo("Success", "Set member updated successfully!")
+                    dialog.destroy()
+                except Exception as e:
+                    messagebox.showerror("Error", f"Failed to update set member: {e}")
+            else:
+                dialog.destroy()
         
         ttk.Button(btn_frame, text="Save", command=save_changes).pack(side=tk.RIGHT, padx=(5, 0))
         ttk.Button(btn_frame, text="Cancel", command=dialog.destroy).pack(side=tk.RIGHT)
@@ -2164,52 +2240,339 @@ tkinter GUI框架
         value_text.focus_set()
         
     def add_table_item(self, key, key_type):
-        """添加表格项"""
+        """添加表格项 - 直接添加到Redis"""
         if key_type == 'hash':
-            # 使用同样的编辑对话框
-            new_item = self.data_tree.insert('', tk.END, values=("", ""))
-            self.show_hash_edit_dialog("", "", new_item)
+            # 使用对话框添加hash字段
+            self.show_add_hash_dialog(key)
         elif key_type == 'list':
             value = simpledialog.askstring("Add List Item", "Enter value:")
             if value is not None:
-                index = len(self.data_tree.get_children())
-                self.data_tree.insert('', tk.END, values=(index, value))
+                try:
+                    # 直接添加到Redis
+                    self.redis_client.rpush(key, value)
+                    # 更新原始数据
+                    if hasattr(self, 'original_list_data'):
+                        self.original_list_data.append(value)
+                    # 刷新显示
+                    self.refresh_current_display(key, key_type)
+                    messagebox.showinfo("Success", "List item added successfully!")
+                except Exception as e:
+                    messagebox.showerror("Error", f"Failed to add list item: {e}")
         elif key_type == 'set':
             value = simpledialog.askstring("Add Set Member", "Enter member:")
             if value is not None:
-                self.data_tree.insert('', tk.END, values=(value,))
+                try:
+                    # 直接添加到Redis
+                    result = self.redis_client.sadd(key, value)
+                    if result > 0:
+                        # 更新原始数据
+                        if hasattr(self, 'original_set_data'):
+                            if value not in self.original_set_data:
+                                self.original_set_data.append(value)
+                        # 刷新显示
+                        self.refresh_current_display(key, key_type)
+                        messagebox.showinfo("Success", "Set member added successfully!")
+                    else:
+                        messagebox.showinfo("Info", "Member already exists in set")
+                except Exception as e:
+                    messagebox.showerror("Error", f"Failed to add set member: {e}")
         elif key_type == 'zset':
             member = simpledialog.askstring("Add ZSet Member", "Enter member:")
             if member:
                 score = simpledialog.askstring("Add ZSet Score", f"Member: {member}\nEnter score:")
                 if score is not None:
-                    self.data_tree.insert('', tk.END, values=(score, member))
+                    try:
+                        score_float = float(score)
+                        # 直接添加到Redis
+                        self.redis_client.zadd(key, {member: score_float})
+                        # 更新原始数据
+                        if hasattr(self, 'original_zset_data'):
+                            # 检查是否已存在该成员
+                            found = False
+                            for i in range(0, len(self.original_zset_data), 2):
+                                if i < len(self.original_zset_data) and self.original_zset_data[i] == member:
+                                    self.original_zset_data[i + 1] = score_float  # 更新分数
+                                    found = True
+                                    break
+                            if not found:
+                                self.original_zset_data.extend([member, score_float])
+                        # 刷新显示
+                        self.refresh_current_display(key, key_type)
+                        messagebox.showinfo("Success", "ZSet member added successfully!")
+                    except ValueError:
+                        messagebox.showerror("Error", "Score must be a valid number")
+                    except Exception as e:
+                        messagebox.showerror("Error", f"Failed to add zset member: {e}")
+    
+    def show_add_hash_dialog(self, key):
+        """显示添加hash字段的对话框"""
+        dialog = tk.Toplevel(self.root)
+        dialog.title("Add Hash Field")
+        dialog.geometry("900x700")
+        dialog.transient(self.root)
+        dialog.grab_set()
+        
+        # 创建滚动框架
+        canvas = tk.Canvas(dialog)
+        scrollbar = ttk.Scrollbar(dialog, orient="vertical", command=canvas.yview)
+        scrollable_frame = ttk.Frame(canvas)
+        
+        scrollable_frame.bind(
+            "<Configure>",
+            lambda e: canvas.configure(scrollregion=canvas.bbox("all"))
+        )
+        
+        canvas.create_window((0, 0), window=scrollable_frame, anchor="nw")
+        canvas.configure(yscrollcommand=scrollbar.set)
+        
+        # 绑定鼠标滚轮事件
+        def _on_mousewheel(event):
+            canvas.yview_scroll(int(-1*(event.delta/120)), "units")
+        
+        canvas.bind_all("<MouseWheel>", _on_mousewheel)
+        
+        canvas.pack(side="left", fill="both", expand=True)
+        scrollbar.pack(side="right", fill="y")
+        
+        # Field编辑
+        field_frame = ttk.LabelFrame(scrollable_frame, text="Field (Key)")
+        field_frame.pack(fill=tk.X, padx=10, pady=(10, 5))
+        
+        field_var = tk.StringVar()
+        field_entry = ttk.Entry(field_frame, textvariable=field_var)
+        field_entry.pack(fill=tk.X, padx=5, pady=5)
+        
+        # Value编辑
+        value_frame = ttk.LabelFrame(scrollable_frame, text="Value")
+        value_frame.pack(fill=tk.BOTH, expand=True, padx=10, pady=5)
+        
+        # JSON格式化按钮
+        json_btn_frame = ttk.Frame(value_frame)
+        json_btn_frame.pack(fill=tk.X, padx=5, pady=5)
+        
+        def format_json():
+            try:
+                import json
+                current_value = value_text.get(1.0, tk.END).strip()
+                parsed = json.loads(current_value)
+                formatted = json.dumps(parsed, indent=2, ensure_ascii=False)
+                value_text.delete(1.0, tk.END)
+                value_text.insert(1.0, formatted)
+            except json.JSONDecodeError:
+                messagebox.showerror("JSON Error", "Invalid JSON format")
+            except Exception as e:
+                messagebox.showerror("Error", f"Failed to format JSON: {e}")
+        
+        def minify_json():
+            try:
+                import json
+                current_value = value_text.get(1.0, tk.END).strip()
+                parsed = json.loads(current_value)
+                minified = json.dumps(parsed, separators=(',', ':'), ensure_ascii=False)
+                value_text.delete(1.0, tk.END)
+                value_text.insert(1.0, minified)
+            except json.JSONDecodeError:
+                messagebox.showerror("JSON Error", "Invalid JSON format")
+            except Exception as e:
+                messagebox.showerror("Error", f"Failed to minify JSON: {e}")
+        
+        ttk.Button(json_btn_frame, text="Format JSON", command=format_json).pack(side=tk.LEFT, padx=(0, 5))
+        ttk.Button(json_btn_frame, text="Minify JSON", command=minify_json).pack(side=tk.LEFT)
+        
+        # 文本编辑器
+        text_frame = ttk.Frame(value_frame)
+        text_frame.pack(fill=tk.BOTH, expand=True, padx=5, pady=5)
+        
+        value_text = tk.Text(text_frame, wrap=tk.WORD, height=20, width=80)
+        value_text.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
+        
+        text_scroll = ttk.Scrollbar(text_frame, orient=tk.VERTICAL, command=value_text.yview)
+        text_scroll.pack(side=tk.RIGHT, fill=tk.Y)
+        value_text.configure(yscrollcommand=text_scroll.set)
+        
+        # 按钮
+        btn_frame = ttk.Frame(scrollable_frame)
+        btn_frame.pack(fill=tk.X, padx=10, pady=10)
+        
+        def save_new_field():
+            new_field = field_var.get().strip()
+            new_value = value_text.get(1.0, tk.END).strip()
+            
+            if not new_field:
+                messagebox.showerror("Error", "Field name cannot be empty")
+                return
+            
+            try:
+                # 直接添加到Redis
+                self.redis_client.hset(key, new_field, new_value)
+                # 更新原始数据
+                if hasattr(self, 'original_hash_data'):
+                    self.original_hash_data[new_field] = new_value
+                # 刷新显示
+                self.refresh_current_display(key, 'hash')
+                messagebox.showinfo("Success", "Hash field added successfully!")
+                canvas.unbind_all("<MouseWheel>")
+                dialog.destroy()
+            except Exception as e:
+                messagebox.showerror("Error", f"Failed to add hash field: {e}")
+        
+        def cancel_dialog():
+            canvas.unbind_all("<MouseWheel>")
+            dialog.destroy()
+        
+        ttk.Button(btn_frame, text="Add", command=save_new_field).pack(side=tk.RIGHT, padx=(5, 0))
+        ttk.Button(btn_frame, text="Cancel", command=cancel_dialog).pack(side=tk.RIGHT)
+        
+        # 设置焦点到field输入框
+        field_entry.focus_set()
+    
+    def refresh_current_display(self, key, key_type):
+        """刷新当前显示，保持过滤状态"""
+        try:
+            # 重新从Redis加载数据
+            if key_type == 'hash':
+                new_data = self.redis_client.hgetall(key)
+                self.original_hash_data = new_data
+                # 如果有过滤状态，重新应用过滤
+                if hasattr(self, 'struct_query_var') and self.struct_query_var.get().strip():
+                    self.filter_hash_data(key)
+                else:
+                    self.load_hash_data_to_tree(new_data)
+            elif key_type == 'list':
+                new_data = self.redis_client.lrange(key, 0, -1)
+                self.original_list_data = new_data
+                if hasattr(self, 'struct_query_var') and self.struct_query_var.get().strip():
+                    self.filter_list_zset_data(key, key_type)
+                else:
+                    self.load_list_data_to_tree(new_data)
+            elif key_type == 'set':
+                new_data = list(self.redis_client.smembers(key))
+                self.original_set_data = new_data
+                if hasattr(self, 'struct_query_var') and self.struct_query_var.get().strip():
+                    self.filter_set_data(key)
+                else:
+                    self.load_set_data_to_tree(new_data)
+            elif key_type == 'zset':
+                new_data = self.redis_client.zrange(key, 0, -1, withscores=True)
+                self.original_zset_data = new_data
+                if hasattr(self, 'struct_query_var') and self.struct_query_var.get().strip():
+                    self.filter_list_zset_data(key, key_type)
+                else:
+                    self.load_zset_data_to_tree(new_data)
+        except Exception as e:
+            messagebox.showerror("Error", f"Failed to refresh display: {e}")
                     
     def update_structured_key(self, key, key_type):
         """更新结构化键"""
         try:
-            # 先删除原键
-            self.redis_client.delete(key)
+            # 收集当前显示的数据（可能被修改过）
+            displayed_data = {}
+            displayed_list = []
+            displayed_set = []
+            displayed_zset = []
             
-            # 根据类型重新创建
             for item in self.data_tree.get_children():
                 values = self.data_tree.item(item)['values']
                 
                 if key_type == 'hash':
                     field, value = values[0], values[1]
-                    self.redis_client.hset(key, field, value)
+                    displayed_data[field] = value
                 elif key_type == 'list':
-                    value = values[1]
-                    self.redis_client.rpush(key, value)
+                    index, value = int(values[0]), values[1]
+                    displayed_list.append((index, value))
                 elif key_type == 'set':
                     value = values[0]
-                    self.redis_client.sadd(key, value)
+                    displayed_set.append(value)
                 elif key_type == 'zset':
                     score, member = float(values[0]), values[1]
-                    self.redis_client.zadd(key, {member: score})
+                    displayed_zset.append((member, score))
+            
+            # 检查是否有过滤状态
+            is_filtered = hasattr(self, 'filter_status_label') and self.filter_status_label.winfo_exists()
+            
+            if is_filtered:
+                # 如果有过滤，需要合并显示的数据和隐藏的数据
+                if key_type == 'hash':
+                    # 合并hash数据：用显示的数据更新原始数据
+                    merged_data = self.original_hash_data.copy()
+                    merged_data.update(displayed_data)
+                    final_data = merged_data
+                elif key_type == 'list':
+                    # 对于list，需要按索引更新
+                    merged_data = self.original_list_data.copy()
+                    for index, value in displayed_list:
+                        if 0 <= index < len(merged_data):
+                            merged_data[index] = value
+                    final_data = merged_data
+                elif key_type == 'set':
+                    # 对于set，需要找出原始数据中对应的项并更新
+                    # 这里比较复杂，因为set的显示是排序后的
+                    # 简化处理：如果有过滤，建议用户先清除过滤再更新
+                    if len(displayed_set) < len(self.original_set_data):
+                        response = messagebox.askyesno(
+                            "Filtered Update Warning", 
+                            "You are updating filtered data. This will only update the visible items.\n\n"
+                            "Do you want to:\n"
+                            "• Yes: Update only visible items (hidden items will be preserved)\n"
+                            "• No: Cancel and clear filter first"
+                        )
+                        if not response:
+                            return
+                    
+                    # 保留原始数据，只更新显示的部分
+                    # 由于set的复杂性，这里采用保守策略
+                    final_data = displayed_set
+                elif key_type == 'zset':
+                    # 对于zset，合并数据
+                    # 将原始数据转换为字典格式便于处理
+                    original_dict = {}
+                    for i in range(0, len(self.original_zset_data), 2):
+                        if i + 1 < len(self.original_zset_data):
+                            member = self.original_zset_data[i]
+                            score = self.original_zset_data[i + 1]
+                            original_dict[member] = score
+                    
+                    # 更新显示的数据
+                    for member, score in displayed_zset:
+                        original_dict[member] = score
+                    
+                    final_data = original_dict
+            else:
+                # 没有过滤，直接使用显示的数据
+                if key_type == 'hash':
+                    final_data = displayed_data
+                elif key_type == 'list':
+                    final_data = [value for index, value in sorted(displayed_list)]
+                elif key_type == 'set':
+                    final_data = displayed_set
+                elif key_type == 'zset':
+                    final_data = {member: score for member, score in displayed_zset}
+            
+            # 先删除原键
+            self.redis_client.delete(key)
+            
+            # 根据类型重新创建
+            if key_type == 'hash':
+                if final_data:
+                    self.redis_client.hset(key, mapping=final_data)
+            elif key_type == 'list':
+                if final_data:
+                    for value in final_data:
+                        self.redis_client.rpush(key, value)
+            elif key_type == 'set':
+                if final_data:
+                    self.redis_client.sadd(key, *final_data)
+            elif key_type == 'zset':
+                if final_data:
+                    self.redis_client.zadd(key, final_data)
                     
             messagebox.showinfo("Success", "Key updated successfully!")
+            
+            # 重新加载数据并清除过滤状态
+            if hasattr(self, 'struct_query_var'):
+                self.struct_query_var.set("")  # 清除过滤输入
             self.load_key_details(key)
+            
         except Exception as e:
             messagebox.showerror("Error", f"Failed to update key: {e}")
             
