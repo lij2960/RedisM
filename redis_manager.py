@@ -780,8 +780,76 @@ tkinter GUI框架
         def test_connection():
             """测试连接功能"""
             try:
-                # 这里可以添加连接测试逻辑
-                messagebox.showinfo("Test Connection", "Connection test feature will be implemented in future version")
+                # 验证必填字段
+                if not fields['name'].get().strip():
+                    messagebox.showerror("Test Failed", "Connection name is required")
+                    return
+                    
+                if not fields['host'].get().strip():
+                    messagebox.showerror("Test Failed", "Redis host is required")
+                    return
+                
+                # 构建测试连接配置
+                test_config = {
+                    'name': fields['name'].get().strip(),
+                    'host': fields['host'].get().strip(),
+                    'port': int(fields['port'].get() or 6379),
+                    'username': fields['username'].get().strip(),
+                    'password': fields['password'].get(),
+                    'use_ssh': ssh_var.get(),
+                    'ssh_host': fields['ssh_host'].get().strip(),
+                    'ssh_port': int(fields['ssh_port'].get() or 22),
+                    'ssh_user': fields['ssh_user'].get().strip(),
+                    'ssh_password': fields['ssh_password'].get(),
+                    'ssh_key': fields['ssh_key'].get().strip(),
+                    'ssh_key_content': fields['ssh_key_content'].get(1.0, tk.END).strip(),
+                    'ssh_key_passphrase': fields['ssh_key_passphrase'].get(),
+                }
+                
+                # SSH验证
+                if test_config['use_ssh']:
+                    if not test_config['ssh_host']:
+                        messagebox.showerror("Test Failed", "SSH host is required when SSH tunnel is enabled")
+                        return
+                    if not test_config['ssh_user']:
+                        messagebox.showerror("Test Failed", "SSH username is required when SSH tunnel is enabled")
+                        return
+                    
+                    auth_method_val = fields['_auth_method'].get()
+                    if auth_method_val == "password" and not test_config['ssh_password']:
+                        messagebox.showerror("Test Failed", "SSH password is required for password authentication")
+                        return
+                    elif auth_method_val == "key" and not test_config['ssh_key'] and not test_config['ssh_key_content']:
+                        messagebox.showerror("Test Failed", "Private key file or content is required for key authentication")
+                        return
+                
+                # 显示测试进度
+                test_btn.config(text="Testing...", state="disabled")
+                dialog.update()
+                
+                # 在后台线程中执行连接测试
+                def test_thread():
+                    try:
+                        result = self.test_redis_connection(test_config)
+                        dialog.after(0, lambda: on_test_complete(result, None))
+                    except Exception as e:
+                        dialog.after(0, lambda: on_test_complete(None, str(e)))
+                
+                def on_test_complete(result, error):
+                    test_btn.config(text="Test Connection", state="normal")
+                    if error:
+                        messagebox.showerror("Test Failed", f"Connection test failed:\n{error}")
+                    else:
+                        messagebox.showinfo("Test Successful", 
+                                          f"✅ Connection test successful!\n\n"
+                                          f"Redis Version: {result.get('version', 'Unknown')}\n"
+                                          f"Connected to: {test_config['host']}:{test_config['port']}\n"
+                                          f"SSH Tunnel: {'Yes' if test_config['use_ssh'] else 'No'}")
+                
+                threading.Thread(target=test_thread, daemon=True).start()
+                
+            except ValueError as e:
+                messagebox.showerror("Test Failed", f"Invalid input: {e}")
             except Exception as e:
                 messagebox.showerror("Test Failed", f"Connection test failed: {e}")
         
@@ -916,6 +984,185 @@ tkinter GUI框架
             
         except Exception as e:
             messagebox.showerror("Disconnect Error", f"Error while disconnecting: {e}")
+    
+    def test_redis_connection(self, config):
+        """测试Redis连接"""
+        test_ssh_client = None
+        test_ssh_tunnel = None
+        test_redis_client = None
+        
+        try:
+            if config.get('use_ssh'):
+                # 测试SSH连接
+                test_ssh_client = paramiko.SSHClient()
+                test_ssh_client.set_missing_host_key_policy(paramiko.AutoAddPolicy())
+                
+                # SSH认证
+                key_path = config.get('ssh_key', '').strip()
+                key_content = config.get('ssh_key_content', '').strip()
+                
+                if key_path or key_content:
+                    # 私钥认证
+                    passphrase = config.get('ssh_key_passphrase') or None
+                    
+                    if key_content:
+                        # 使用私钥内容
+                        import io
+                        from paramiko import RSAKey, DSSKey, ECDSAKey, Ed25519Key
+                        
+                        key_file = io.StringIO(key_content)
+                        key = None
+                        
+                        for key_class in [RSAKey, DSSKey, ECDSAKey, Ed25519Key]:
+                            try:
+                                key_file.seek(0)
+                                key = key_class.from_private_key(key_file, password=passphrase)
+                                break
+                            except:
+                                continue
+                        
+                        if not key:
+                            raise Exception("Invalid private key content")
+                        
+                        test_ssh_client.connect(
+                            hostname=config['ssh_host'],
+                            port=config['ssh_port'],
+                            username=config['ssh_user'],
+                            pkey=key,
+                            timeout=10
+                        )
+                    elif key_path:
+                        # 使用私钥文件
+                        if not os.path.exists(key_path):
+                            raise Exception(f"Private key file not found: {key_path}")
+                        
+                        test_ssh_client.connect(
+                            hostname=config['ssh_host'],
+                            port=config['ssh_port'],
+                            username=config['ssh_user'],
+                            key_filename=key_path,
+                            passphrase=passphrase,
+                            timeout=10
+                        )
+                else:
+                    # 密码认证
+                    test_ssh_client.connect(
+                        hostname=config['ssh_host'],
+                        port=config['ssh_port'],
+                        username=config['ssh_user'],
+                        password=config['ssh_password'],
+                        timeout=10
+                    )
+                
+                # 创建测试隧道
+                local_port = self.find_free_port()
+                test_ssh_tunnel = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+                test_ssh_tunnel.bind(('127.0.0.1', local_port))
+                test_ssh_tunnel.listen(1)
+                
+                # 简单的隧道测试 - 创建一个临时连接
+                def test_tunnel():
+                    try:
+                        transport = test_ssh_client.get_transport()
+                        dest_addr = (config['host'], config['port'])
+                        channel = transport.open_channel('direct-tcpip', dest_addr, ('127.0.0.1', local_port))
+                        channel.close()
+                        return True
+                    except:
+                        return False
+                
+                if not test_tunnel():
+                    raise Exception("SSH tunnel test failed")
+                
+                redis_host = '127.0.0.1'
+                redis_port = local_port
+                
+                # 为测试创建一个简单的隧道处理器
+                def simple_tunnel_handler():
+                    try:
+                        client_socket, addr = test_ssh_tunnel.accept()
+                        transport = test_ssh_client.get_transport()
+                        dest_addr = (config['host'], config['port'])
+                        channel = transport.open_channel('direct-tcpip', dest_addr, addr)
+                        
+                        # 简单的数据转发测试
+                        import select
+                        while True:
+                            r, w, e = select.select([client_socket, channel], [], [], 1)
+                            if client_socket in r:
+                                data = client_socket.recv(1024)
+                                if not data:
+                                    break
+                                channel.send(data)
+                            if channel in r:
+                                data = channel.recv(1024)
+                                if not data:
+                                    break
+                                client_socket.send(data)
+                    except:
+                        pass
+                    finally:
+                        try:
+                            client_socket.close()
+                        except:
+                            pass
+                        try:
+                            channel.close()
+                        except:
+                            pass
+                
+                threading.Thread(target=simple_tunnel_handler, daemon=True).start()
+                time.sleep(0.2)  # 等待隧道建立
+                
+            else:
+                # 直接连接
+                redis_host = config['host']
+                redis_port = config['port']
+            
+            # 测试Redis连接
+            test_redis_client = redis.Redis(
+                host=redis_host,
+                port=redis_port,
+                password=config.get('password') or None,
+                username=config.get('username') or None,
+                db=0,
+                decode_responses=True,
+                socket_timeout=5,
+                socket_connect_timeout=5
+            )
+            
+            # 执行PING测试
+            test_redis_client.ping()
+            
+            # 获取Redis信息
+            info = test_redis_client.info()
+            redis_version = info.get('redis_version', 'Unknown')
+            
+            return {
+                'success': True,
+                'version': redis_version,
+                'info': info
+            }
+            
+        finally:
+            # 清理测试资源
+            if test_redis_client:
+                try:
+                    test_redis_client.close()
+                except:
+                    pass
+            
+            if test_ssh_tunnel:
+                try:
+                    test_ssh_tunnel.close()
+                except:
+                    pass
+                    
+            if test_ssh_client:
+                try:
+                    test_ssh_client.close()
+                except:
+                    pass
         
     def setup_ssh_tunnel(self):
         ssh_config = self.current_conn
