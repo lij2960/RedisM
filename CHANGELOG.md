@@ -5,6 +5,23 @@ All notable changes to RedisM will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.0.1] - 2024-12-25
+
+### Added
+- ✅ **Test Connection Feature**: Implemented real connection testing with SSH tunnel support
+- ✅ **Connection Validation**: Comprehensive validation for Redis and SSH configurations
+- ✅ **Real-time Feedback**: Async connection testing with progress indication
+
+### Improved
+- ✅ **File Selection**: Removed file type restrictions for SSH private key selection
+- ✅ **Default Values**: Fixed duplicate default values issue in connection editing
+- ✅ **User Experience**: Enhanced connection dialog with better error handling
+
+### Fixed
+- 🐛 **Duplicate Defaults**: Fixed issue where default values were filled twice when editing connections
+- 🐛 **Layout Consistency**: Resolved SSH authentication layout width inconsistencies
+- 🐛 **File Compatibility**: Improved private key file selection to support all file types
+
 ## [1.0.0] - 2024-12-25
 
 ### Added

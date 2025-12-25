@@ -1,0 +1,4 @@
+
+    Redis Manager Icon Placeholder
+    This file serves as an icon placeholder.
+    

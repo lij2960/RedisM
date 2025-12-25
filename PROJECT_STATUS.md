@@ -1,6 +1,6 @@
 # RedisM Project Status
 
-## 📊 Current Status: **STABLE v1.0.0**
+## 📊 Current Status: **STABLE v1.0.1**
 
 ### 🎯 Project Overview
 RedisM is a modern Redis management tool for macOS, providing an intuitive GUI interface for Redis database operations with advanced features like SSH tunneling, real-time operations, and comprehensive data type support.
@@ -140,6 +140,6 @@ RedisM is a modern Redis management tool for macOS, providing an intuitive GUI i
 ---
 
 **Last Updated**: December 25, 2024  
-**Version**: 1.0.0  
+**Version**: 1.0.1  
 **Status**: Stable Release  
 **Maintainer**: Active

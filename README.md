@@ -2,7 +2,7 @@
 
 <div align="center">
 
-![RedisM Logo](https://img.shields.io/badge/RedisM-v1.0.0-blue?style=for-the-badge)
+![RedisM Logo](https://img.shields.io/badge/RedisM-v1.0.1-blue?style=for-the-badge)
 ![Platform](https://img.shields.io/badge/Platform-macOS-lightgrey?style=for-the-badge)
 ![Python](https://img.shields.io/badge/Python-3.14+-green?style=for-the-badge)
 
@@ -142,6 +142,11 @@ This creates:
 - `tkinter` - GUI framework (included with Python)
 
 ## 🔄 Recent Updates
+
+### Version 1.0.1
+- ✅ **Test Connection Feature**: Real connection testing with comprehensive validation
+- ✅ **Enhanced File Selection**: Support for all file types in SSH private key selection
+- ✅ **Bug Fixes**: Resolved duplicate default values and layout consistency issues
 
 ### Version 1.0.0
 - ✅ **Enhanced Connection Dialog**: Modern UI with unified SSH authentication layout

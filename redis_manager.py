@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 
-__version__ = "1.0.0"
+__version__ = "1.0.1"
 __app_name__ = "RedisM"
 
 import tkinter as tk
@@ -616,8 +616,7 @@ tkinter GUI框架
         
         def browse_key():
             filename = filedialog.askopenfilename(
-                title="Select SSH Private Key",
-                filetypes=[("Private Key Files", "*.pem *.key *.rsa"), ("All Files", "*.*")]
+                title="Select SSH Private Key"
             )
             if filename:
                 fields['ssh_key'].delete(0, tk.END)
