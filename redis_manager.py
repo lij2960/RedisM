@@ -417,12 +417,15 @@ tkinter GUI框架
     def show_connection_dialog(self, conn=None):
         dialog = tk.Toplevel(self.root)
         dialog.title("Add Connection" if conn is None else "Edit Connection")
-        dialog.geometry("500x700")
+        dialog.geometry("600x800")
         dialog.transient(self.root)
         dialog.grab_set()
         
+        # 设置对话框样式 - 使用内联样式避免兼容性问题
+        # 不使用自定义样式，直接在组件中设置属性
+        
         # 创建滚动框架
-        canvas = tk.Canvas(dialog)
+        canvas = tk.Canvas(dialog, bg='#F5F5F5')
         scrollbar = ttk.Scrollbar(dialog, orient="vertical", command=canvas.yview)
         scrollable_frame = ttk.Frame(canvas)
         
@@ -453,124 +456,213 @@ tkinter GUI框架
         # 表单字段
         fields = {}
         
-        # 基本信息
-        ttk.Label(scrollable_frame, text="Connection Name:").pack(anchor=tk.W, padx=10, pady=(10, 0))
-        fields['name'] = ttk.Entry(scrollable_frame)
-        fields['name'].pack(fill=tk.X, padx=10, pady=(0, 10))
+        # 标题
+        title_frame = ttk.Frame(scrollable_frame)
+        title_frame.pack(fill=tk.X, padx=20, pady=(20, 10))
         
-        ttk.Label(scrollable_frame, text="Redis Host:").pack(anchor=tk.W, padx=10)
-        fields['host'] = ttk.Entry(scrollable_frame)
-        fields['host'].pack(fill=tk.X, padx=10, pady=(0, 10))
+        title_text = "Add New Connection" if conn is None else "Edit Connection"
+        title_label = ttk.Label(title_frame, text=title_text, font=('SF Pro Display', 16, 'bold'))
+        title_label.pack(anchor=tk.W)
         
-        ttk.Label(scrollable_frame, text="Redis Port:").pack(anchor=tk.W, padx=10)
-        fields['port'] = ttk.Entry(scrollable_frame)
-        fields['port'].pack(fill=tk.X, padx=10, pady=(0, 10))
+        subtitle_label = ttk.Label(title_frame, text="Configure your Redis connection settings", 
+                                  font=('SF Pro Display', 10), foreground='#666666')
+        subtitle_label.pack(anchor=tk.W, pady=(2, 0))
         
-        ttk.Label(scrollable_frame, text="Username (optional):").pack(anchor=tk.W, padx=10)
-        fields['username'] = ttk.Entry(scrollable_frame)
-        fields['username'].pack(fill=tk.X, padx=10, pady=(0, 10))
+        # Redis连接信息
+        redis_frame = ttk.LabelFrame(scrollable_frame, text="🔗 Redis Connection", padding=10)
+        redis_frame.pack(fill=tk.X, padx=20, pady=(0, 15))
         
-        ttk.Label(scrollable_frame, text="Password:").pack(anchor=tk.W, padx=10)
-        fields['password'] = ttk.Entry(scrollable_frame, show="*")
-        fields['password'].pack(fill=tk.X, padx=10, pady=(0, 10))
+        # 使用Grid布局来美化表单
+        redis_inner = ttk.Frame(redis_frame)
+        redis_inner.pack(fill=tk.X, padx=10, pady=10)
         
-        # 键数量限制
-        ttk.Label(scrollable_frame, text="Max Keys to Display (0 = unlimited):").pack(anchor=tk.W, padx=10)
-        fields['max_keys'] = ttk.Entry(scrollable_frame)
-        fields['max_keys'].pack(fill=tk.X, padx=10, pady=(0, 10))
+        # 连接名称
+        ttk.Label(redis_inner, text="Connection Name:", font=('SF Pro Display', 10)).grid(row=0, column=0, sticky='w', pady=(0, 5))
+        fields['name'] = ttk.Entry(redis_inner, font=('SF Pro Display', 10))
+        fields['name'].grid(row=0, column=1, sticky='ew', padx=(10, 0), pady=(0, 5))
         
-        # 数据库数量配置
-        ttk.Label(scrollable_frame, text="Number of Databases (1-128):").pack(anchor=tk.W, padx=10)
-        fields['db_count'] = ttk.Entry(scrollable_frame)
-        fields['db_count'].pack(fill=tk.X, padx=10, pady=(0, 10))
+        # Redis主机和端口
+        ttk.Label(redis_inner, text="Redis Host:", font=('SF Pro Display', 10)).grid(row=1, column=0, sticky='w', pady=(0, 5))
+        host_frame = ttk.Frame(redis_inner)
+        host_frame.grid(row=1, column=1, sticky='ew', padx=(10, 0), pady=(0, 5))
         
-        # SSH选项
+        fields['host'] = ttk.Entry(host_frame, font=('SF Pro Display', 10))
+        fields['host'].pack(side=tk.LEFT, fill=tk.X, expand=True)
+        
+        ttk.Label(host_frame, text="Port:", font=('SF Pro Display', 10)).pack(side=tk.LEFT, padx=(10, 5))
+        fields['port'] = ttk.Entry(host_frame, width=8, font=('SF Pro Display', 10))
+        fields['port'].pack(side=tk.RIGHT)
+        # 默认值将在后面根据是否为新连接来设置
+        
+        # 认证信息
+        ttk.Label(redis_inner, text="Username:", font=('SF Pro Display', 10)).grid(row=2, column=0, sticky='w', pady=(0, 5))
+        fields['username'] = ttk.Entry(redis_inner, font=('SF Pro Display', 10))
+        fields['username'].grid(row=2, column=1, sticky='ew', padx=(10, 0), pady=(0, 5))
+        
+        ttk.Label(redis_inner, text="Password:", font=('SF Pro Display', 10)).grid(row=3, column=0, sticky='w', pady=(0, 5))
+        fields['password'] = ttk.Entry(redis_inner, show="*", font=('SF Pro Display', 10))
+        fields['password'].grid(row=3, column=1, sticky='ew', padx=(10, 0), pady=(0, 5))
+        
+        # 配置选项
+        ttk.Label(redis_inner, text="Max Keys (0=unlimited):", font=('SF Pro Display', 10)).grid(row=4, column=0, sticky='w', pady=(0, 5))
+        config_frame = ttk.Frame(redis_inner)
+        config_frame.grid(row=4, column=1, sticky='ew', padx=(10, 0), pady=(0, 5))
+        
+        fields['max_keys'] = ttk.Entry(config_frame, width=12, font=('SF Pro Display', 10))
+        fields['max_keys'].pack(side=tk.LEFT)
+        # 默认值将在后面根据是否为新连接来设置
+        
+        ttk.Label(config_frame, text="Databases (1-128):", font=('SF Pro Display', 10)).pack(side=tk.LEFT, padx=(15, 5))
+        fields['db_count'] = ttk.Entry(config_frame, width=8, font=('SF Pro Display', 10))
+        fields['db_count'].pack(side=tk.LEFT)
+        # 默认值将在后面根据是否为新连接来设置
+        
+        # 配置Grid权重
+        redis_inner.columnconfigure(1, weight=1)
+        
+        # SSH隧道配置
+        ssh_frame = ttk.LabelFrame(scrollable_frame, text="🔐 SSH Tunnel (Optional)", padding=10)
+        ssh_frame.pack(fill=tk.X, padx=20, pady=(0, 15))
+        
+        ssh_inner = ttk.Frame(ssh_frame)
+        ssh_inner.pack(fill=tk.X, padx=10, pady=10)
+        
+        # SSH启用选项
         ssh_var = tk.BooleanVar()
-        ssh_check = ttk.Checkbutton(scrollable_frame, text="Use SSH Tunnel", variable=ssh_var)
-        ssh_check.pack(anchor=tk.W, padx=10, pady=10)
+        ssh_check = ttk.Checkbutton(ssh_inner, text="Enable SSH Tunnel", variable=ssh_var,
+                                   command=lambda: self.toggle_ssh_section(ssh_var.get(), ssh_content_frame))
+        ssh_check.pack(anchor=tk.W, pady=(0, 10))
         
-        # SSH字段
-        ssh_frame = ttk.LabelFrame(scrollable_frame, text="SSH Configuration")
-        ssh_frame.pack(fill=tk.X, padx=10, pady=10)
+        # SSH内容框架
+        ssh_content_frame = ttk.Frame(ssh_inner)
+        ssh_content_frame.pack(fill=tk.X)
         
-        ttk.Label(ssh_frame, text="SSH Host:").pack(anchor=tk.W, padx=5, pady=(5, 0))
-        fields['ssh_host'] = ttk.Entry(ssh_frame)
-        fields['ssh_host'].pack(fill=tk.X, padx=5, pady=(0, 5))
+        # SSH服务器信息
+        ssh_server_frame = ttk.Frame(ssh_content_frame)
+        ssh_server_frame.pack(fill=tk.X, pady=(0, 15))
         
-        ttk.Label(ssh_frame, text="SSH Port:").pack(anchor=tk.W, padx=5)
-        fields['ssh_port'] = ttk.Entry(ssh_frame)
-        fields['ssh_port'].pack(fill=tk.X, padx=5, pady=(0, 5))
+        ttk.Label(ssh_server_frame, text="SSH Host:", font=('SF Pro Display', 10)).grid(row=0, column=0, sticky='w', pady=(0, 5))
+        ssh_host_frame = ttk.Frame(ssh_server_frame)
+        ssh_host_frame.grid(row=0, column=1, sticky='ew', padx=(10, 0), pady=(0, 5))
         
-        ttk.Label(ssh_frame, text="SSH Username:").pack(anchor=tk.W, padx=5)
-        fields['ssh_user'] = ttk.Entry(ssh_frame)
-        fields['ssh_user'].pack(fill=tk.X, padx=5, pady=(0, 5))
+        fields['ssh_host'] = ttk.Entry(ssh_host_frame, font=('SF Pro Display', 10))
+        fields['ssh_host'].pack(side=tk.LEFT, fill=tk.X, expand=True)
         
-        # SSH认证方式选择
-        auth_frame = ttk.LabelFrame(ssh_frame, text="Authentication Method")
-        auth_frame.pack(fill=tk.X, padx=5, pady=5)
+        ttk.Label(ssh_host_frame, text="Port:", font=('SF Pro Display', 10)).pack(side=tk.LEFT, padx=(10, 5))
+        fields['ssh_port'] = ttk.Entry(ssh_host_frame, width=8, font=('SF Pro Display', 10))
+        fields['ssh_port'].pack(side=tk.RIGHT)
+        # 默认值将在后面根据是否为新连接来设置
+        
+        ttk.Label(ssh_server_frame, text="SSH Username:", font=('SF Pro Display', 10)).grid(row=1, column=0, sticky='w', pady=(0, 5))
+        fields['ssh_user'] = ttk.Entry(ssh_server_frame, font=('SF Pro Display', 10))
+        fields['ssh_user'].grid(row=1, column=1, sticky='ew', padx=(10, 0), pady=(0, 5))
+        
+        ssh_server_frame.columnconfigure(1, weight=1)
+        
+        # SSH认证方式
+        auth_frame = ttk.LabelFrame(ssh_content_frame, text="Authentication Method", padding=10)
+        auth_frame.pack(fill=tk.X, pady=(0, 10))
+        
+        auth_inner = ttk.Frame(auth_frame)
+        auth_inner.pack(fill=tk.X, padx=10, pady=10)
         
         auth_method = tk.StringVar(value="password")
         
-        # 创建认证方式选择按钮
-        ttk.Radiobutton(auth_frame, text="Password", variable=auth_method, value="password", 
-                       command=lambda: self.toggle_ssh_auth_fields(auth_method.get(), fields)).pack(anchor=tk.W, padx=5)
-        ttk.Radiobutton(auth_frame, text="Private Key", variable=auth_method, value="key",
-                       command=lambda: self.toggle_ssh_auth_fields(auth_method.get(), fields)).pack(anchor=tk.W, padx=5)
+        # 认证方式选择按钮 - 使用更美观的布局
+        auth_buttons_frame = ttk.Frame(auth_inner)
+        auth_buttons_frame.pack(fill=tk.X, pady=(0, 15))
         
-        # SSH密码字段框架
-        password_frame = ttk.Frame(ssh_frame)
-        ttk.Label(password_frame, text="SSH Password:").pack(anchor=tk.W)
-        fields['ssh_password'] = ttk.Entry(password_frame, show="*")
-        fields['ssh_password'].pack(fill=tk.X, pady=(0, 5))
+        password_radio = ttk.Radiobutton(auth_buttons_frame, text="🔑 Password Authentication", 
+                                       variable=auth_method, value="password",
+                                       command=lambda: self.toggle_ssh_auth_fields(auth_method.get(), fields))
+        password_radio.pack(side=tk.LEFT, padx=(0, 20))
         
-        # SSH私钥字段框架
-        key_frame = ttk.Frame(ssh_frame)
+        key_radio = ttk.Radiobutton(auth_buttons_frame, text="🔐 Private Key Authentication", 
+                                  variable=auth_method, value="key",
+                                  command=lambda: self.toggle_ssh_auth_fields(auth_method.get(), fields))
+        key_radio.pack(side=tk.LEFT)
+        
+        # 统一的认证内容框架 - 设置固定尺寸以保持一致性
+        auth_content_frame = ttk.Frame(auth_inner)
+        auth_content_frame.pack(fill=tk.X, pady=(0, 0))  # 移除expand=True
+        auth_content_frame.configure(height=200)  # 设置固定高度
+        auth_content_frame.pack_propagate(False)  # 防止子组件改变框架大小
+        
+        # 密码认证框架
+        password_frame = ttk.Frame(auth_content_frame)
+        
+        password_inner = ttk.Frame(password_frame)
+        password_inner.pack(fill=tk.X, padx=10, pady=10)
+        
+        ttk.Label(password_inner, text="SSH Password:", font=('SF Pro Display', 10)).grid(row=0, column=0, sticky='w', pady=(0, 5))
+        fields['ssh_password'] = ttk.Entry(password_inner, show="*", font=('SF Pro Display', 10))
+        fields['ssh_password'].grid(row=0, column=1, sticky='ew', padx=(10, 0), pady=(0, 5))
+        
+        password_inner.columnconfigure(1, weight=1)
+        
+        # 私钥认证框架
+        key_frame = ttk.Frame(auth_content_frame)
+        
+        key_inner = ttk.Frame(key_frame)
+        key_inner.pack(fill=tk.X, padx=10, pady=10)
         
         # 私钥文件选择
-        ttk.Label(key_frame, text="Private Key File:").pack(anchor=tk.W)
-        key_input_frame = ttk.Frame(key_frame)
-        key_input_frame.pack(fill=tk.X, pady=(0, 5))
+        ttk.Label(key_inner, text="Private Key File:", font=('SF Pro Display', 10)).grid(row=0, column=0, sticky='w', pady=(0, 5))
+        key_file_frame = ttk.Frame(key_inner)
+        key_file_frame.grid(row=0, column=1, sticky='ew', padx=(10, 0), pady=(0, 5))
         
-        fields['ssh_key'] = ttk.Entry(key_input_frame)
+        fields['ssh_key'] = ttk.Entry(key_file_frame, font=('SF Pro Display', 10))
         fields['ssh_key'].pack(side=tk.LEFT, fill=tk.X, expand=True)
         
         def browse_key():
             filename = filedialog.askopenfilename(
-                title="Select SSH Private Key"
+                title="Select SSH Private Key",
+                filetypes=[("Private Key Files", "*.pem *.key *.rsa"), ("All Files", "*.*")]
             )
             if filename:
                 fields['ssh_key'].delete(0, tk.END)
                 fields['ssh_key'].insert(0, filename)
         
-        ttk.Button(key_input_frame, text="Browse", command=browse_key).pack(side=tk.RIGHT, padx=(5, 0))
+        browse_btn = ttk.Button(key_file_frame, text="Browse...", command=browse_key)
+        browse_btn.pack(side=tk.RIGHT, padx=(10, 0))
         
         # 私钥内容输入
-        ttk.Label(key_frame, text="Or paste private key content:").pack(anchor=tk.W, pady=(10, 0))
-        key_content_frame = ttk.Frame(key_frame)
-        key_content_frame.pack(fill=tk.BOTH, expand=True, pady=(0, 5))
+        ttk.Label(key_inner, text="Or paste private key content:", font=('SF Pro Display', 10)).grid(row=1, column=0, sticky='nw', pady=(15, 5))
+        key_content_frame = ttk.Frame(key_inner)
+        key_content_frame.grid(row=1, column=1, sticky='ew', padx=(10, 0), pady=(15, 5))
         
-        fields['ssh_key_content'] = tk.Text(key_content_frame, height=8, wrap=tk.WORD)
-        fields['ssh_key_content'].pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
+        # 设置固定宽度的文本框，防止影响整体布局
+        fields['ssh_key_content'] = tk.Text(key_content_frame, height=3, width=40, wrap=tk.WORD,  # 设置固定宽度和高度
+                                          font=('Menlo', 9), bg='white', relief='solid', borderwidth=1)
+        fields['ssh_key_content'].pack(side=tk.LEFT)  # 不使用expand和fill
         
         key_content_scroll = ttk.Scrollbar(key_content_frame, orient=tk.VERTICAL, command=fields['ssh_key_content'].yview)
         key_content_scroll.pack(side=tk.RIGHT, fill=tk.Y)
         fields['ssh_key_content'].configure(yscrollcommand=key_content_scroll.set)
         
-        # 密钥密码字段（用于加密的私钥）
-        ttk.Label(key_frame, text="Key Passphrase (if encrypted):").pack(anchor=tk.W)
-        fields['ssh_key_passphrase'] = ttk.Entry(key_frame, show="*")
-        fields['ssh_key_passphrase'].pack(fill=tk.X, pady=(0, 5))
+        # 密钥密码
+        ttk.Label(key_inner, text="Key Passphrase:", font=('SF Pro Display', 10)).grid(row=2, column=0, sticky='w', pady=(15, 5))
+        fields['ssh_key_passphrase'] = ttk.Entry(key_inner, show="*", font=('SF Pro Display', 10))
+        fields['ssh_key_passphrase'].grid(row=2, column=1, sticky='ew', padx=(10, 0), pady=(15, 5))
+        
+        key_inner.columnconfigure(1, weight=1)
+        # 移除行权重设置以保持一致的高度
+        # key_inner.rowconfigure(1, weight=1)
         
         # 保存框架引用
         fields['_auth_method'] = auth_method
         fields['_password_frame'] = password_frame
         fields['_key_frame'] = key_frame
+        fields['_auth_content_frame'] = auth_content_frame
+        fields['_ssh_content_frame'] = ssh_content_frame
         
-        # 初始化显示状态 - 默认显示密码认证
-        password_frame.pack(fill=tk.X, padx=5, pady=5)
+        # 初始化显示状态 - 两个框架都使用相同的pack参数
+        password_frame.pack(fill=tk.X, expand=False)  # 确保不会expand
+        ssh_content_frame.pack_forget()  # 默认隐藏SSH配置
         
         # 填充现有数据
         if conn:
+            # 编辑现有连接 - 填充现有值
             fields['name'].insert(0, conn.get('name', ''))
             fields['host'].insert(0, conn.get('host', 'localhost'))
             fields['port'].insert(0, str(conn.get('port', 6379)))
@@ -578,7 +670,12 @@ tkinter GUI框架
             fields['password'].insert(0, conn.get('password', ''))
             fields['max_keys'].insert(0, str(conn.get('max_keys', 0)))
             fields['db_count'].insert(0, str(conn.get('db_count', 16)))
-            ssh_var.set(conn.get('use_ssh', False))
+            
+            use_ssh = conn.get('use_ssh', False)
+            ssh_var.set(use_ssh)
+            if use_ssh:
+                ssh_content_frame.pack(fill=tk.X)
+                
             fields['ssh_host'].insert(0, conn.get('ssh_host', ''))
             fields['ssh_port'].insert(0, str(conn.get('ssh_port', 22)))
             fields['ssh_user'].insert(0, conn.get('ssh_user', ''))
@@ -592,37 +689,68 @@ tkinter GUI框架
             fields['_auth_method'].set(auth_method_val)
             self.toggle_ssh_auth_fields(auth_method_val, fields)
         else:
+            # 新建连接 - 设置默认值
             fields['host'].insert(0, 'localhost')
             fields['port'].insert(0, '6379')
             fields['max_keys'].insert(0, '0')
             fields['db_count'].insert(0, '16')
             fields['ssh_port'].insert(0, '22')
         
-        # 按钮
+        # 按钮区域
         btn_frame = ttk.Frame(scrollable_frame)
-        btn_frame.pack(fill=tk.X, padx=10, pady=10)
+        btn_frame.pack(fill=tk.X, padx=20, pady=(10, 20))
+        
+        # 分隔线
+        separator = ttk.Separator(btn_frame, orient='horizontal')
+        separator.pack(fill=tk.X, pady=(0, 15))
         
         def save_connection():
             try:
-                db_count = int(fields['db_count'].get() or 16)
-                if db_count < 1 or db_count > 128:
-                    messagebox.showerror("Error", "Database count must be between 1 and 128")
+                # 验证必填字段
+                if not fields['name'].get().strip():
+                    messagebox.showerror("Validation Error", "Connection name is required")
                     return
                     
+                if not fields['host'].get().strip():
+                    messagebox.showerror("Validation Error", "Redis host is required")
+                    return
+                
+                db_count = int(fields['db_count'].get() or 16)
+                if db_count < 1 or db_count > 128:
+                    messagebox.showerror("Validation Error", "Database count must be between 1 and 128")
+                    return
+                
+                # SSH验证
+                if ssh_var.get():
+                    if not fields['ssh_host'].get().strip():
+                        messagebox.showerror("Validation Error", "SSH host is required when SSH tunnel is enabled")
+                        return
+                    if not fields['ssh_user'].get().strip():
+                        messagebox.showerror("Validation Error", "SSH username is required when SSH tunnel is enabled")
+                        return
+                    
+                    auth_method_val = fields['_auth_method'].get()
+                    if auth_method_val == "password" and not fields['ssh_password'].get():
+                        messagebox.showerror("Validation Error", "SSH password is required for password authentication")
+                        return
+                    elif auth_method_val == "key" and not fields['ssh_key'].get() and not fields['ssh_key_content'].get(1.0, tk.END).strip():
+                        messagebox.showerror("Validation Error", "Private key file or content is required for key authentication")
+                        return
+                    
                 new_conn = {
-                    'name': fields['name'].get(),
-                    'host': fields['host'].get(),
+                    'name': fields['name'].get().strip(),
+                    'host': fields['host'].get().strip(),
                     'port': int(fields['port'].get() or 6379),
-                    'username': fields['username'].get(),
+                    'username': fields['username'].get().strip(),
                     'password': fields['password'].get(),
                     'max_keys': int(fields['max_keys'].get() or 0),
                     'db_count': db_count,
                     'use_ssh': ssh_var.get(),
-                    'ssh_host': fields['ssh_host'].get(),
+                    'ssh_host': fields['ssh_host'].get().strip(),
                     'ssh_port': int(fields['ssh_port'].get() or 22),
-                    'ssh_user': fields['ssh_user'].get(),
+                    'ssh_user': fields['ssh_user'].get().strip(),
                     'ssh_password': fields['ssh_password'].get(),
-                    'ssh_key': fields['ssh_key'].get(),
+                    'ssh_key': fields['ssh_key'].get().strip(),
                     'ssh_key_content': fields['ssh_key_content'].get(1.0, tk.END).strip(),
                     'ssh_key_passphrase': fields['ssh_key_passphrase'].get(),
                 }
@@ -637,25 +765,62 @@ tkinter GUI框架
                 
                 self.refresh_connection_list()
                 self.save_connections()
+                canvas.unbind_all("<MouseWheel>")
                 dialog.destroy()
                 
+                # 显示成功消息
+                action = "updated" if conn else "created"
+                messagebox.showinfo("Success", f"Connection '{new_conn['name']}' {action} successfully!")
+                
             except ValueError as e:
-                messagebox.showerror("Error", f"Invalid input: {e}")
+                messagebox.showerror("Validation Error", f"Invalid input: {e}")
+            except Exception as e:
+                messagebox.showerror("Error", f"Failed to save connection: {e}")
         
-        ttk.Button(btn_frame, text="Save", command=save_connection).pack(side=tk.RIGHT, padx=(5, 0))
-        ttk.Button(btn_frame, text="Cancel", command=dialog.destroy).pack(side=tk.RIGHT)
+        def test_connection():
+            """测试连接功能"""
+            try:
+                # 这里可以添加连接测试逻辑
+                messagebox.showinfo("Test Connection", "Connection test feature will be implemented in future version")
+            except Exception as e:
+                messagebox.showerror("Test Failed", f"Connection test failed: {e}")
         
+        # 按钮布局
+        button_container = ttk.Frame(btn_frame)
+        button_container.pack(fill=tk.X)
+        
+        # 左侧按钮
+        test_btn = ttk.Button(button_container, text="Test Connection", command=test_connection)
+        test_btn.pack(side=tk.LEFT)
+        
+        # 右侧按钮
+        cancel_btn = ttk.Button(button_container, text="Cancel", command=lambda: [canvas.unbind_all("<MouseWheel>"), dialog.destroy()])
+        cancel_btn.pack(side=tk.RIGHT)
+        
+        save_btn = ttk.Button(button_container, text="Save Connection", command=save_connection)
+        save_btn.pack(side=tk.RIGHT, padx=(0, 10))
+        
+        # 设置焦点
+        fields['name'].focus_set()
+    
+    def toggle_ssh_section(self, enabled, ssh_content_frame):
+        """切换SSH配置区域的显示/隐藏"""
+        if enabled:
+            ssh_content_frame.pack(fill=tk.X)
+        else:
+            ssh_content_frame.pack_forget()
+    
     def toggle_ssh_auth_fields(self, auth_method, fields):
-        """切换SSH认证方式显示"""
-        # 隐藏所有框架
+        """切换SSH认证方式显示 - 统一布局，防止宽度变化"""
+        # 隐藏所有认证框架
         fields['_password_frame'].pack_forget()
         fields['_key_frame'].pack_forget()
         
-        # 显示对应框架
+        # 显示对应的认证框架 - 使用相同的pack参数
         if auth_method == "password":
-            fields['_password_frame'].pack(fill=tk.X, padx=5, pady=5)
+            fields['_password_frame'].pack(fill=tk.X, expand=False)
         else:  # key
-            fields['_key_frame'].pack(fill=tk.X, padx=5, pady=5)
+            fields['_key_frame'].pack(fill=tk.X, expand=False)
         
     def on_connection_select(self, event):
         selection = self.conn_listbox.curselection()
