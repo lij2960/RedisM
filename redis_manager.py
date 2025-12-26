@@ -902,11 +902,19 @@ tkinter GUI框架
         if not self.current_conn:
             messagebox.showwarning("Warning", "Please select a connection")
             return
+        
+        # 如果已经连接到同一个连接，不需要重新连接
+        selection = self.conn_listbox.curselection()
+        if selection and selection[0] == self.current_conn_index:
+            return
             
         def connect_thread():
             try:
                 self.status_label.config(text="Connecting...")
                 self.root.update()
+                
+                # 先断开现有连接
+                self.cleanup_current_connection()
                 
                 if self.current_conn.get('use_ssh'):
                     # SSH隧道连接 - 通过SSH服务器连接内网Redis
@@ -938,51 +946,161 @@ tkinter GUI框架
                 self.root.after(0, lambda msg=error_msg: self.on_connect_error(msg))
         
         threading.Thread(target=connect_thread, daemon=True).start()
+    
+    def cleanup_current_connection(self):
+        """清理当前连接状态"""
+        try:
+            # 停止保活线程
+            self.stop_keepalive()
+            
+            # 关闭Redis连接
+            if self.redis_client:
+                try:
+                    self.redis_client.close()
+                except:
+                    pass
+                self.redis_client = None
+            
+            # 关闭SSH隧道
+            if self.ssh_tunnel:
+                try:
+                    self.ssh_tunnel.close()
+                except:
+                    pass
+                self.ssh_tunnel = None
+                
+            # 关闭SSH客户端
+            if self.ssh_client:
+                try:
+                    self.ssh_client.close()
+                except:
+                    pass
+                self.ssh_client = None
+            
+            # 清空UI状态
+            self.clear_ui_state()
+            
+        except Exception as e:
+            print(f"Error during connection cleanup: {e}")
+    
+    def clear_ui_state(self):
+        """清空UI状态"""
+        try:
+            # 清空键列表
+            if hasattr(self, 'keys_text'):
+                self.keys_text.config(state='normal')
+                self.keys_text.delete('1.0', tk.END)
+                self.keys_text.config(state='disabled')
+            
+            # 重置键数据
+            self.keys_data = {}
+            self.group_data = {}
+            self.selected_line = None
+            self.expanded_groups = set()
+            self.tree_structure = {}
+            
+            # 清空键详情
+            if hasattr(self, 'key_details_frame'):
+                for widget in self.key_details_frame.winfo_children():
+                    widget.destroy()
+                
+                # 显示欢迎界面
+                welcome_frame = ttk.Frame(self.key_details_frame)
+                welcome_frame.pack(expand=True)
+                ttk.Label(welcome_frame, text="🔑", font=('SF Pro Display', 48)).pack(pady=(0, 10))
+                ttk.Label(welcome_frame, text="Select a key to view details", style='Title.TLabel').pack()
+            
+        except Exception as e:
+            print(f"Error during UI state cleanup: {e}")
         
     def disconnect_redis(self):
         """断开Redis连接"""
         try:
-            self.stop_keepalive()
+            # 使用统一的清理方法
+            self.cleanup_current_connection()
             
-            if self.redis_client:
-                self.redis_client.close()
-                self.redis_client = None
-            
-            if self.ssh_tunnel:
-                self.ssh_tunnel.close()
-                self.ssh_tunnel = None
-                
-            if self.ssh_client:
-                self.ssh_client.close()
-                self.ssh_client = None
-            
-            # 重置UI状态
+            # 重置连接索引
             self.current_conn_index = -1
+            
+            # 更新UI状态
             self.status_label.config(text="🔌 Disconnected")
             self.connect_btn.config(text="🔌 Connect", state="normal")
             self.disconnect_btn.config(state="disabled")
-            
-            # 清空键列表
-            self.keys_text.config(state='normal')
-            self.keys_text.delete('1.0', tk.END)
-            self.keys_text.config(state='disabled')
-            self.keys_data = {}
-            self.selected_line = None
-            
-            # 清空键详情
-            for widget in self.key_details_frame.winfo_children():
-                widget.destroy()
-            
-            welcome_frame = ttk.Frame(self.key_details_frame)
-            welcome_frame.pack(expand=True)
-            ttk.Label(welcome_frame, text="🔑", font=('SF Pro Display', 48)).pack(pady=(0, 10))
-            ttk.Label(welcome_frame, text="Select a key to view details", style='Title.TLabel').pack()
             
             # 更新连接列表显示
             self.refresh_connection_list()
             
         except Exception as e:
             messagebox.showerror("Disconnect Error", f"Error while disconnecting: {e}")
+    
+    def check_and_reconnect(self):
+        """检查连接状态，如果断开则尝试自动重连"""
+        try:
+            if not self.redis_client:
+                return False
+            
+            # 尝试ping测试连接
+            self.redis_client.ping()
+            return True
+            
+        except Exception as e:
+            # 连接断开，尝试重连
+            try:
+                self.root.after(0, lambda: self.status_label.config(text="🔄 Reconnecting..."))
+                
+                # 重新建立连接
+                if self.current_conn and self.current_conn_index >= 0:
+                    # 清理旧连接
+                    if self.redis_client:
+                        try:
+                            self.redis_client.close()
+                        except:
+                            pass
+                    
+                    if self.ssh_tunnel:
+                        try:
+                            self.ssh_tunnel.close()
+                        except:
+                            pass
+                    
+                    if self.ssh_client:
+                        try:
+                            self.ssh_client.close()
+                        except:
+                            pass
+                    
+                    # 重新连接
+                    if self.current_conn.get('use_ssh'):
+                        self.setup_ssh_tunnel()
+                        redis_host = '127.0.0.1'
+                        redis_port = self.ssh_tunnel.getsockname()[1]
+                    else:
+                        redis_host = self.current_conn['host']
+                        redis_port = self.current_conn['port']
+                    
+                    self.redis_client = redis.Redis(
+                        host=redis_host,
+                        port=redis_port,
+                        password=self.current_conn.get('password') or None,
+                        username=self.current_conn.get('username') or None,
+                        db=int(self.db_var.get().split()[1]) if hasattr(self, 'db_var') and self.db_var.get() else 0,
+                        decode_responses=True
+                    )
+                    
+                    # 测试重连
+                    self.redis_client.ping()
+                    
+                    self.root.after(0, lambda: self.status_label.config(text=f"✅ Reconnected to {self.current_conn['name']}"))
+                    return True
+                else:
+                    self.root.after(0, lambda: self.status_label.config(text="❌ No connection to reconnect"))
+                    return False
+                    
+            except Exception as reconnect_error:
+                self.root.after(0, lambda: self.status_label.config(text=f"❌ Reconnection failed: {str(reconnect_error)}"))
+                self.root.after(0, lambda: messagebox.showerror("Reconnection Failed", 
+                    f"Failed to reconnect to Redis:\n{str(reconnect_error)}\n\nPlease check your connection and try again."))
+                return False
     
     def test_redis_connection(self, config):
         """测试Redis连接"""
@@ -1318,6 +1436,10 @@ tkinter GUI框架
             
     def search_keys(self):
         if not self.redis_client:
+            return
+        
+        # 检查连接状态，如果断开则尝试重连
+        if not self.check_and_reconnect():
             return
             
         # 重置总键数估计
@@ -1686,6 +1808,10 @@ tkinter GUI框架
             
         def load_thread():
             try:
+                # 检查连接状态，如果断开则尝试重连
+                if not self.check_and_reconnect():
+                    return
+                
                 # 检查键是否存在
                 if not self.redis_client.exists(key):
                     self.root.after(0, lambda: messagebox.showerror("Error", f"Key '{key}' does not exist"))
