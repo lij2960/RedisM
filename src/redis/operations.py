@@ -1,0 +1,208 @@
+#!/usr/bin/env python3
+# -*- coding: utf-8 -*-
+
+"""Redis操作类"""
+
+import time
+from ..config import MAX_KEYS_STREAMING
+
+
+class RedisOperations:
+    """Redis数据操作"""
+    
+    def __init__(self, redis_client):
+        self.redis_client = redis_client
+    
+    def get_keys(self, pattern="*", max_keys=0):
+        """获取键列表"""
+        if max_keys == 0:
+            # 无限制模式 - 使用流式加载
+            return self._load_keys_streaming(pattern)
+        else:
+            # 限制模式 - 快速加载指定数量
+            keys = []
+            for key in self.redis_client.scan_iter(match=pattern, count=1000):
+                keys.append(key)
+                if len(keys) >= max_keys:
+                    break
+            return keys, None
+    
+    def _load_keys_streaming(self, pattern):
+        """流式加载键"""
+        keys = []
+        count = 0
+        
+        # 获取当前数据库的总键数
+        try:
+            info = self.redis_client.info('keyspace')
+            current_db = self.redis_client.connection_pool.connection_kwargs.get('db', 0)
+            db_key = f'db{current_db}'
+            total_keys = info.get(db_key, {}).get('keys', None) if db_key in info else None
+        except:
+            total_keys = None
+        
+        for key in self.redis_client.scan_iter(match=pattern, count=1000):
+            keys.append(key)
+            count += 1
+            
+            # 超过最大键数时停止加载
+            if count >= MAX_KEYS_STREAMING:
+                break
+        
+        return keys, total_keys
+    
+    def get_key_info(self, key):
+        """获取键信息"""
+        if not self.redis_client.exists(key):
+            return None
+        
+        key_type = self.redis_client.type(key)
+        ttl = self.redis_client.ttl(key)
+        
+        return {
+            'type': key_type,
+            'ttl': ttl
+        }
+    
+    def get_key_value(self, key, key_type=None):
+        """获取键值"""
+        if key_type is None:
+            key_type = self.redis_client.type(key)
+        
+        try:
+            if key_type == 'string':
+                return self.redis_client.get(key)
+            elif key_type == 'list':
+                return self.redis_client.lrange(key, 0, -1)
+            elif key_type == 'set':
+                return list(self.redis_client.smembers(key))
+            elif key_type == 'hash':
+                # 对hash类型使用更安全的读取方式
+                hash_len = self.redis_client.hlen(key)
+                if hash_len > 1000:  # 大hash分批读取
+                    value = {}
+                    cursor = 0
+                    while True:
+                        cursor, fields = self.redis_client.hscan(key, cursor, count=100)
+                        value.update(fields)
+                        if cursor == 0:
+                            break
+                    return value
+                else:
+                    return self.redis_client.hgetall(key)
+            elif key_type == 'zset':
+                return self.redis_client.zrange(key, 0, -1, withscores=True)
+            else:
+                return str(self.redis_client.dump(key))
+        except Exception as e:
+            return f"Error reading value: {str(e)}"
+    
+    def set_key_value(self, key, value, key_type):
+        """设置键值"""
+        if key_type == 'string':
+            self.redis_client.set(key, value)
+        elif key_type == 'hash':
+            # 尝试解析JSON格式的hash数据
+            try:
+                import json
+                hash_data = json.loads(value)
+                if isinstance(hash_data, dict):
+                    self.redis_client.delete(key)
+                    self.redis_client.hset(key, mapping=hash_data)
+                else:
+                    self.redis_client.set(key, value)
+            except json.JSONDecodeError:
+                self.redis_client.set(key, value)
+        else:
+            self.redis_client.set(key, value)
+    
+    def delete_key(self, key):
+        """删除键"""
+        return self.redis_client.delete(key)
+    
+    def execute_command(self, command, *args):
+        """执行Redis命令"""
+        return self.redis_client.execute_command(command, *args)
+    
+    # Hash操作
+    def hash_get(self, key, field):
+        """获取hash字段"""
+        return self.redis_client.hget(key, field)
+    
+    def hash_set(self, key, field, value):
+        """设置hash字段"""
+        return self.redis_client.hset(key, field, value)
+    
+    def hash_delete(self, key, field):
+        """删除hash字段"""
+        return self.redis_client.hdel(key, field)
+    
+    def hash_keys(self, key):
+        """获取hash所有字段"""
+        return self.redis_client.hkeys(key)
+    
+    def hash_values(self, key):
+        """获取hash所有值"""
+        return self.redis_client.hvals(key)
+    
+    def hash_getall(self, key):
+        """获取hash所有字段和值"""
+        return self.redis_client.hgetall(key)
+    
+    # List操作
+    def list_push(self, key, value, left=False):
+        """向列表添加元素"""
+        if left:
+            return self.redis_client.lpush(key, value)
+        else:
+            return self.redis_client.rpush(key, value)
+    
+    def list_set(self, key, index, value):
+        """设置列表指定位置的值"""
+        return self.redis_client.lset(key, index, value)
+    
+    def list_range(self, key, start=0, end=-1):
+        """获取列表范围"""
+        return self.redis_client.lrange(key, start, end)
+    
+    def list_length(self, key):
+        """获取列表长度"""
+        return self.redis_client.llen(key)
+    
+    # Set操作
+    def set_add(self, key, *values):
+        """向集合添加成员"""
+        return self.redis_client.sadd(key, *values)
+    
+    def set_remove(self, key, *values):
+        """从集合删除成员"""
+        return self.redis_client.srem(key, *values)
+    
+    def set_members(self, key):
+        """获取集合所有成员"""
+        return self.redis_client.smembers(key)
+    
+    def set_card(self, key):
+        """获取集合成员数量"""
+        return self.redis_client.scard(key)
+    
+    # ZSet操作
+    def zset_add(self, key, mapping):
+        """向有序集合添加成员"""
+        return self.redis_client.zadd(key, mapping)
+    
+    def zset_remove(self, key, *members):
+        """从有序集合删除成员"""
+        return self.redis_client.zrem(key, *members)
+    
+    def zset_range(self, key, start=0, end=-1, withscores=False):
+        """获取有序集合范围"""
+        return self.redis_client.zrange(key, start, end, withscores=withscores)
+    
+    def zset_card(self, key):
+        """获取有序集合成员数量"""
+        return self.redis_client.zcard(key)
+    
+    def zset_score(self, key, member):
+        """获取有序集合成员分数"""
+        return self.redis_client.zscore(key, member)

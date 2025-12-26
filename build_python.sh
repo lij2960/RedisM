@@ -2,7 +2,7 @@
 
 # RedisM Mac应用打包脚本
 
-PYTHON_SCRIPT="redis_manager.py"
+PYTHON_SCRIPT="main.py"
 ICON_SCRIPT="create_icon.py"
 VENV_DIR="venv"
 PYTHON_BIN="/usr/local/bin/python3.14"
@@ -27,8 +27,8 @@ echo "激活虚拟环境..."
 source "$VENV_DIR/bin/activate"
 
 # 从配置文件中读取应用名称和版本号
-APP_NAME=$(python3 -c "from config import __app_name__; print(__app_name__)")
-VERSION=$(python3 -c "from config import __version__; print(__version__)")
+APP_NAME=$(python3 -c "from src.config import __app_name__; print(__app_name__)")
+VERSION=$(python3 -c "from src.config import __version__; print(__version__)")
 
 echo "构建 $APP_NAME v$VERSION..."
 
@@ -48,18 +48,13 @@ fi
 
 # 清理之前的构建
 echo "清理之前的构建文件..."
-rm -rf build dist *.spec
+rm -rf build dist
 
 # 创建应用程序包
 echo "创建Mac应用程序包..."
 
-pyinstaller --onedir --windowed \
-    --name="$APP_NAME" \
-    $ICON_FILE \
-    --osx-bundle-identifier="com.redismanager.app" \
-    --target-arch=x86_64 \
-    --hidden-import=config \
-    "$PYTHON_SCRIPT"
+# 使用自定义的spec文件进行构建
+pyinstaller RedisM.spec
 
 # 检查构建结果
 if [ -d "dist/$APP_NAME.app" ]; then
