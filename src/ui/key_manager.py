@@ -193,8 +193,9 @@ class KeyManager:
             self.data_tree = ttk.Treeview(table_frame, columns=columns, show='headings', style=style_name, selectmode='extended')
             self.data_tree.heading('Field', text='Field')
             self.data_tree.heading('Value', text='Value')
-            self.data_tree.column('Field', width=150, minwidth=100)
-            self.data_tree.column('Value', width=300, minwidth=200)
+            # 自适应列宽：Field列占30%，Value列占70%
+            self.data_tree.column('Field', width=200, minwidth=100, stretch=True)
+            self.data_tree.column('Value', width=400, minwidth=200, stretch=True)
             
             # 存储原始数据
             self.original_hash_data = value if isinstance(value, dict) else {}
@@ -205,8 +206,9 @@ class KeyManager:
             self.data_tree = ttk.Treeview(table_frame, columns=columns, show='headings', style=style_name, selectmode='extended')
             self.data_tree.heading('Index', text='Index')
             self.data_tree.heading('Value', text='Value')
-            self.data_tree.column('Index', width=80, minwidth=60)
-            self.data_tree.column('Value', width=400, minwidth=200)
+            # 自适应列宽：Index列固定宽度，Value列自适应
+            self.data_tree.column('Index', width=80, minwidth=60, stretch=False)
+            self.data_tree.column('Value', width=500, minwidth=200, stretch=True)
             
             self.original_list_data = value if isinstance(value, list) else []
             self._load_list_data_to_tree(self.original_list_data)
@@ -215,7 +217,8 @@ class KeyManager:
             columns = ('Value',)
             self.data_tree = ttk.Treeview(table_frame, columns=columns, show='headings', style=style_name, selectmode='extended')
             self.data_tree.heading('Value', text='Value')
-            self.data_tree.column('Value', width=400, minwidth=200)
+            # 自适应列宽：Value列占满整个宽度
+            self.data_tree.column('Value', width=600, minwidth=200, stretch=True)
             
             self.original_set_data = list(value) if isinstance(value, (list, set)) else []
             self._load_set_data_to_tree(self.original_set_data)
@@ -225,8 +228,9 @@ class KeyManager:
             self.data_tree = ttk.Treeview(table_frame, columns=columns, show='headings', style=style_name, selectmode='extended')
             self.data_tree.heading('Score', text='Score')
             self.data_tree.heading('Member', text='Member')
-            self.data_tree.column('Score', width=100, minwidth=80)
-            self.data_tree.column('Member', width=300, minwidth=200)
+            # 自适应列宽：Score列固定宽度，Member列自适应
+            self.data_tree.column('Score', width=100, minwidth=80, stretch=False)
+            self.data_tree.column('Member', width=500, minwidth=200, stretch=True)
             
             self.original_zset_data = value if isinstance(value, list) else []
             self._load_zset_data_to_tree(self.original_zset_data)
@@ -808,8 +812,31 @@ class KeyManager:
     
     def _execute_key_query(self, key, key_type):
         """执行键查询"""
-        # 实现查询逻辑
-        pass
+        query = self.query_var.get().strip()
+        if not query:
+            messagebox.showwarning("Warning", "Please enter a query")
+            return
+        
+        redis_client = self.main_window.get_redis_client()
+        if not redis_client:
+            messagebox.showerror("Error", "No Redis connection available")
+            return
+        
+        try:
+            # 检查连接状态
+            if not self.main_window.redis_conn.check_and_reconnect():
+                return
+            
+            # 如果查询的键名与当前键不同，加载新键
+            if query != key:
+                self.load_key_details(query)
+                return
+            
+            # 如果是同一个键，刷新当前键的数据
+            self.load_key_details(key)
+            
+        except Exception as e:
+            messagebox.showerror("Error", f"Failed to execute query: {e}")
     
     def _format_json_value(self):
         """格式化JSON值"""
