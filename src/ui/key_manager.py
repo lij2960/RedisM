@@ -11,7 +11,7 @@ import json
 from ..config import *
 from ..redis.operations import RedisOperations
 from ..utils.helpers import format_json, minify_json
-from ..dialogs.key_dialogs import HashEditDialog, SetEditDialog, AddHashDialog, ListEditDialog, ZSetEditDialog
+from ..dialogs.key_dialogs import HashEditDialog, SetEditDialog, AddHashDialog, ListEditDialog, ZSetEditDialog, AddListDialog, AddSetDialog, AddZSetDialog, AddNewKeyDialog
 
 
 class KeyManager:
@@ -190,7 +190,7 @@ class KeyManager:
         # 根据类型创建表格
         if key_type == 'hash':
             columns = ('Field', 'Value')
-            self.data_tree = ttk.Treeview(table_frame, columns=columns, show='headings', style=style_name)
+            self.data_tree = ttk.Treeview(table_frame, columns=columns, show='headings', style=style_name, selectmode='extended')
             self.data_tree.heading('Field', text='Field')
             self.data_tree.heading('Value', text='Value')
             self.data_tree.column('Field', width=150, minwidth=100)
@@ -202,7 +202,7 @@ class KeyManager:
             
         elif key_type == 'list':
             columns = ('Index', 'Value')
-            self.data_tree = ttk.Treeview(table_frame, columns=columns, show='headings', style=style_name)
+            self.data_tree = ttk.Treeview(table_frame, columns=columns, show='headings', style=style_name, selectmode='extended')
             self.data_tree.heading('Index', text='Index')
             self.data_tree.heading('Value', text='Value')
             self.data_tree.column('Index', width=80, minwidth=60)
@@ -213,7 +213,7 @@ class KeyManager:
             
         elif key_type == 'set':
             columns = ('Value',)
-            self.data_tree = ttk.Treeview(table_frame, columns=columns, show='headings', style=style_name)
+            self.data_tree = ttk.Treeview(table_frame, columns=columns, show='headings', style=style_name, selectmode='extended')
             self.data_tree.heading('Value', text='Value')
             self.data_tree.column('Value', width=400, minwidth=200)
             
@@ -222,7 +222,7 @@ class KeyManager:
             
         elif key_type == 'zset':
             columns = ('Score', 'Member')
-            self.data_tree = ttk.Treeview(table_frame, columns=columns, show='headings', style=style_name)
+            self.data_tree = ttk.Treeview(table_frame, columns=columns, show='headings', style=style_name, selectmode='extended')
             self.data_tree.heading('Score', text='Score')
             self.data_tree.heading('Member', text='Member')
             self.data_tree.column('Score', width=100, minwidth=80)
@@ -238,8 +238,10 @@ class KeyManager:
         tree_scroll.pack(side=tk.RIGHT, fill=tk.Y)
         self.data_tree.configure(yscrollcommand=tree_scroll.set)
         
-        # 绑定双击事件
+        # 绑定双击事件和右键菜单
         self.data_tree.bind('<Double-1>', lambda e: self._edit_table_item(key, key_type))
+        self.data_tree.bind('<Button-2>', lambda e: self._show_context_menu(e, key, key_type))  # 右键菜单
+        self.data_tree.bind('<Control-Button-1>', lambda e: self._show_context_menu(e, key, key_type))  # macOS Ctrl+点击
     
     def _create_table_buttons(self, parent, key, key_type):
         """创建表格操作按钮"""
@@ -248,6 +250,8 @@ class KeyManager:
         
         ttk.Button(btn_frame, text="Add Item", 
                   command=lambda: self._add_table_item(key, key_type)).pack(side=tk.LEFT, padx=(0, 5))
+        ttk.Button(btn_frame, text="Delete Item", 
+                  command=lambda: self._delete_table_item(key, key_type)).pack(side=tk.LEFT, padx=(0, 5))
         ttk.Button(btn_frame, text="Update All", 
                   command=lambda: self._update_structured_key(key, key_type)).pack(side=tk.LEFT, padx=(0, 5))
         ttk.Button(btn_frame, text="Refresh", 
@@ -286,9 +290,7 @@ class KeyManager:
         ttk.Button(btn_frame, text="Delete", 
                   command=lambda: self._delete_key(key)).pack(side=tk.LEFT, padx=(0, 5))
         ttk.Button(btn_frame, text="Refresh", 
-                  command=lambda: self.load_key_details(key)).pack(side=tk.LEFT, padx=(0, 5))
-        ttk.Button(btn_frame, text="Add New Key", 
-                  command=self._add_new_key).pack(side=tk.LEFT)
+                  command=lambda: self.load_key_details(key)).pack(side=tk.LEFT)
     
     # 数据加载方法
     def _load_hash_data_to_tree(self, hash_data):
@@ -485,7 +487,225 @@ class KeyManager:
             result = dialog.show()
             if result:
                 self._refresh_current_display(key, key_type)
-        # 其他类型的添加...
+        elif key_type == 'list':
+            dialog = AddListDialog(self.main_window.root, key, self.main_window)
+            result = dialog.show()
+            if result:
+                self._refresh_current_display(key, key_type)
+        elif key_type == 'set':
+            dialog = AddSetDialog(self.main_window.root, key, self.main_window)
+            result = dialog.show()
+            if result:
+                self._refresh_current_display(key, key_type)
+        elif key_type == 'zset':
+            dialog = AddZSetDialog(self.main_window.root, key, self.main_window)
+            result = dialog.show()
+            if result:
+                self._refresh_current_display(key, key_type)
+        else:
+            messagebox.showinfo("Info", f"Add item not supported for type '{key_type}'")
+    
+    def _delete_table_item(self, key, key_type):
+        """删除表格项（支持批量删除）"""
+        selections = self.data_tree.selection()
+        if not selections:
+            messagebox.showwarning("No Selection", "Please select one or more items to delete.")
+            return
+        
+        # 获取所有选中项的信息
+        items_to_delete = []
+        for selection in selections:
+            item = self.data_tree.item(selection)
+            values = item['values']
+            items_to_delete.append(values)
+        
+        # 根据数据类型确定删除的内容描述
+        if len(items_to_delete) == 1:
+            # 单个删除
+            values = items_to_delete[0]
+            if key_type == 'hash':
+                field = values[0]
+                confirm_msg = f"Are you sure you want to delete hash field '{field}' from key '{key}'?"
+                delete_desc = f"hash field '{field}'"
+            elif key_type == 'set':
+                member = values[0]
+                confirm_msg = f"Are you sure you want to delete member '{member}' from set '{key}'?"
+                delete_desc = f"set member '{member}'"
+            elif key_type == 'list':
+                index, value = values[0], values[1]
+                confirm_msg = f"Are you sure you want to delete list item at index {index} (value: '{value}') from key '{key}'?"
+                delete_desc = f"list item at index {index}"
+            elif key_type == 'zset':
+                score, member = values[0], values[1]
+                confirm_msg = f"Are you sure you want to delete member '{member}' (score: {score}) from sorted set '{key}'?"
+                delete_desc = f"zset member '{member}'"
+        else:
+            # 批量删除
+            count = len(items_to_delete)
+            if key_type == 'hash':
+                confirm_msg = f"Are you sure you want to delete {count} hash fields from key '{key}'?"
+                delete_desc = f"{count} hash fields"
+            elif key_type == 'set':
+                confirm_msg = f"Are you sure you want to delete {count} members from set '{key}'?"
+                delete_desc = f"{count} set members"
+            elif key_type == 'list':
+                confirm_msg = f"Are you sure you want to delete {count} items from list '{key}'?"
+                delete_desc = f"{count} list items"
+            elif key_type == 'zset':
+                confirm_msg = f"Are you sure you want to delete {count} members from sorted set '{key}'?"
+                delete_desc = f"{count} zset members"
+        
+        if key_type not in ['hash', 'set', 'list', 'zset']:
+            messagebox.showerror("Error", f"Delete operation not supported for type '{key_type}'")
+            return
+        
+        # 确认删除
+        if not messagebox.askyesno("Confirm Delete", confirm_msg):
+            return
+        
+        try:
+            redis_client = self.main_window.get_redis_client()
+            if not redis_client:
+                messagebox.showerror("Error", "No Redis connection available")
+                return
+            
+            redis_ops = RedisOperations(redis_client)
+            success_count = 0
+            failed_items = []
+            
+            # 执行删除操作
+            if key_type == 'hash':
+                for values in items_to_delete:
+                    field = values[0]
+                    result = redis_ops.hash_delete(key, field)
+                    if result:
+                        success_count += 1
+                    else:
+                        failed_items.append(field)
+            
+            elif key_type == 'set':
+                # 批量删除set成员
+                members = [values[0] for values in items_to_delete]
+                result = redis_ops.set_remove(key, *members)
+                success_count = result  # set_remove返回实际删除的数量
+                if success_count < len(members):
+                    failed_items = members[success_count:]
+            
+            elif key_type == 'list':
+                # List批量删除需要按索引从大到小排序，避免索引变化影响
+                indices = [(int(values[0]), values) for values in items_to_delete]
+                indices.sort(reverse=True)  # 从大到小排序
+                
+                for index, values in indices:
+                    result = redis_ops.list_remove_by_index(key, index)
+                    if result:
+                        success_count += 1
+                    else:
+                        failed_items.append(f"index {index}")
+            
+            elif key_type == 'zset':
+                # 批量删除zset成员
+                members = [values[1] for values in items_to_delete]  # member在第二列
+                result = redis_ops.zset_remove(key, *members)
+                success_count = result  # zset_remove返回实际删除的数量
+                if success_count < len(members):
+                    failed_items = members[success_count:]
+            
+            # 显示结果
+            if success_count > 0:
+                if failed_items:
+                    messagebox.showwarning("Partial Success", 
+                                         f"Successfully deleted {success_count} items.\n"
+                                         f"Failed to delete: {', '.join(map(str, failed_items))}")
+                else:
+                    messagebox.showinfo("Success", f"Successfully deleted {delete_desc}")
+            else:
+                messagebox.showwarning("Warning", f"No items were deleted. They may not exist.")
+            
+            # 刷新显示
+            self._refresh_current_display(key, key_type)
+            
+            # 刷新左侧键列表（以防键被完全删除）
+            self.main_window.left_panel.search_keys()
+            
+        except Exception as e:
+            messagebox.showerror("Error", f"Failed to delete {delete_desc}: {str(e)}")
+    
+    def _show_context_menu(self, event, key, key_type):
+        """显示右键菜单"""
+        # 选中点击的项
+        item = self.data_tree.identify_row(event.y)
+        if item:
+            # 如果点击的项没有被选中，则选中它
+            if item not in self.data_tree.selection():
+                self.data_tree.selection_set(item)
+            
+            # 创建右键菜单
+            context_menu = tk.Menu(self.main_window.root, tearoff=0)
+            
+            # 获取选中项数量
+            selection_count = len(self.data_tree.selection())
+            
+            # 根据数据类型和选中数量添加菜单项
+            if selection_count == 1:
+                # 单选菜单
+                if key_type == 'hash':
+                    context_menu.add_command(label="✏️ Edit Field", 
+                                           command=lambda: self._edit_table_item(key, key_type))
+                    context_menu.add_separator()
+                    context_menu.add_command(label="🗑️ Delete Field", 
+                                           command=lambda: self._delete_table_item(key, key_type))
+                elif key_type == 'set':
+                    context_menu.add_command(label="✏️ Edit Member", 
+                                           command=lambda: self._edit_table_item(key, key_type))
+                    context_menu.add_separator()
+                    context_menu.add_command(label="🗑️ Delete Member", 
+                                           command=lambda: self._delete_table_item(key, key_type))
+                elif key_type == 'list':
+                    context_menu.add_command(label="✏️ Edit Item", 
+                                           command=lambda: self._edit_table_item(key, key_type))
+                    context_menu.add_separator()
+                    context_menu.add_command(label="🗑️ Delete Item", 
+                                           command=lambda: self._delete_table_item(key, key_type))
+                elif key_type == 'zset':
+                    context_menu.add_command(label="✏️ Edit Member", 
+                                           command=lambda: self._edit_table_item(key, key_type))
+                    context_menu.add_separator()
+                    context_menu.add_command(label="🗑️ Delete Member", 
+                                           command=lambda: self._delete_table_item(key, key_type))
+            else:
+                # 多选菜单
+                if key_type == 'hash':
+                    context_menu.add_command(label=f"🗑️ Delete {selection_count} Fields", 
+                                           command=lambda: self._delete_table_item(key, key_type))
+                elif key_type == 'set':
+                    context_menu.add_command(label=f"🗑️ Delete {selection_count} Members", 
+                                           command=lambda: self._delete_table_item(key, key_type))
+                elif key_type == 'list':
+                    context_menu.add_command(label=f"🗑️ Delete {selection_count} Items", 
+                                           command=lambda: self._delete_table_item(key, key_type))
+                elif key_type == 'zset':
+                    context_menu.add_command(label=f"🗑️ Delete {selection_count} Members", 
+                                           command=lambda: self._delete_table_item(key, key_type))
+            
+            # 添加通用菜单项
+            context_menu.add_separator()
+            context_menu.add_command(label="🔄 Refresh", 
+                                   command=lambda: self.load_key_details(key))
+            
+            # 添加选择相关菜单
+            context_menu.add_separator()
+            context_menu.add_command(label="📋 Select All", 
+                                   command=lambda: self.data_tree.selection_set(self.data_tree.get_children()))
+            if selection_count > 0:
+                context_menu.add_command(label="❌ Clear Selection", 
+                                       command=lambda: self.data_tree.selection_remove(self.data_tree.selection()))
+            
+            # 显示菜单
+            try:
+                context_menu.tk_popup(event.x_root, event.y_root)
+            finally:
+                context_menu.grab_release()
     
     def _refresh_current_display(self, key, key_type):
         """刷新当前显示"""
@@ -580,8 +800,11 @@ class KeyManager:
     
     def _add_new_key(self):
         """添加新键"""
-        # 实现添加新键的对话框
-        pass
+        dialog = AddNewKeyDialog(self.main_window.root, self.main_window)
+        result = dialog.show()
+        if result:
+            # 刷新左侧键列表
+            self.main_window.left_panel.search_keys()
     
     def _execute_key_query(self, key, key_type):
         """执行键查询"""

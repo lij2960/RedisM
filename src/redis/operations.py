@@ -169,6 +169,30 @@ class RedisOperations:
         """获取列表长度"""
         return self.redis_client.llen(key)
     
+    def list_remove_by_value(self, key, value, count=1):
+        """从列表中删除指定值的元素"""
+        return self.redis_client.lrem(key, count, value)
+    
+    def list_remove_by_index(self, key, index):
+        """从列表中删除指定索引的元素"""
+        try:
+            # 获取当前列表
+            current_list = self.redis_client.lrange(key, 0, -1)
+            if 0 <= index < len(current_list):
+                # 删除指定索引的元素
+                current_list.pop(index)
+                
+                # 重新设置整个列表
+                pipe = self.redis_client.pipeline()
+                pipe.delete(key)
+                if current_list:  # 如果列表不为空，重新添加所有元素
+                    pipe.rpush(key, *current_list)
+                pipe.execute()
+                return True
+            return False
+        except Exception:
+            return False
+    
     # Set操作
     def set_add(self, key, *values):
         """向集合添加成员"""

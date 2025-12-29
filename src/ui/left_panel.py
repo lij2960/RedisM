@@ -111,7 +111,7 @@ class LeftPanel:
         search_frame = ttk.LabelFrame(self.parent, text="🔍 Keys", padding="10")
         search_frame.pack(fill=tk.BOTH, expand=True)
         
-        # 分隔符设置
+        # 分隔符设置和添加键按钮
         sep_frame = ttk.Frame(search_frame)
         sep_frame.pack(fill=tk.X, pady=(0, 10))
         ttk.Label(sep_frame, text="Separator:", 
@@ -119,8 +119,12 @@ class LeftPanel:
         self.separator_var = tk.StringVar(value=":")
         sep_entry = ttk.Entry(sep_frame, textvariable=self.separator_var, width=5,
                              font=self.main_window.style_manager.get_font())
-        sep_entry.pack(side=tk.LEFT, padx=(5, 0))
+        sep_entry.pack(side=tk.LEFT, padx=(5, 10))
         sep_entry.bind('<KeyRelease>', self._on_separator_change)
+        
+        # Add New Key按钮
+        ttk.Button(sep_frame, text="➕ Add New Key", 
+                  command=self._add_new_key).pack(side=tk.LEFT)
         
         # 搜索框
         search_input_frame = ttk.Frame(search_frame)
@@ -520,6 +524,29 @@ class LeftPanel:
         """分隔符改变事件"""
         if self.main_window.get_redis_client() and hasattr(self, 'current_keys'):
             self._update_keys_tree(self.current_keys)
+    
+    def _add_new_key(self):
+        """添加新键"""
+        # 调用key_manager的添加新键功能
+        if hasattr(self.main_window, 'right_panel') and hasattr(self.main_window.right_panel, 'key_manager'):
+            self.main_window.right_panel.key_manager._add_new_key()
+        else:
+            # 备用方案：显示简单的输入对话框
+            from tkinter import simpledialog, messagebox
+            key_name = simpledialog.askstring("Add New Key", "Enter key name:")
+            if key_name:
+                key_value = simpledialog.askstring("Add New Key", "Enter key value:")
+                if key_value is not None:  # 允许空值
+                    try:
+                        redis_client = self.main_window.get_redis_client()
+                        if redis_client:
+                            redis_client.set(key_name, key_value)
+                            messagebox.showinfo("Success", f"Key '{key_name}' added successfully!")
+                            self.search_keys()  # 刷新键列表
+                        else:
+                            messagebox.showerror("Error", "No Redis connection available")
+                    except Exception as e:
+                        messagebox.showerror("Error", f"Failed to add key: {e}")
     
     # 鼠标事件处理
     def _on_mouse_motion(self, event):

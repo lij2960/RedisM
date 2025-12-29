@@ -626,6 +626,655 @@ class AddHashDialog(BaseDialog):
             
         except Exception as e:
             messagebox.showerror("Error", f"Failed to add hash field: {e}")
+
+
+class AddListDialog(BaseDialog):
+    """添加List元素对话框"""
+    
+    def __init__(self, parent, key, main_window):
+        self.key = key
+        self.main_window = main_window
+        
+        super().__init__(parent, "Add List Item", "600x400")
+        self._setup_ui()
+    
+    def _setup_ui(self):
+        """设置UI"""
+        # 说明
+        info_frame = ttk.Frame(self.scrollable_frame)
+        info_frame.pack(fill=tk.X, padx=10, pady=(10, 5))
+        
+        ttk.Label(info_frame, text=f"Add new item to list: {self.key}", 
+                 font=('Arial', 12, 'bold')).pack(anchor=tk.W)
+        
+        # 位置选择
+        position_frame = ttk.LabelFrame(self.scrollable_frame, text="Position")
+        position_frame.pack(fill=tk.X, padx=10, pady=(5, 5))
+        
+        self.position_var = tk.StringVar(value="end")
+        ttk.Radiobutton(position_frame, text="Add to end (RPUSH)", 
+                       variable=self.position_var, value="end").pack(anchor=tk.W, padx=5, pady=2)
+        ttk.Radiobutton(position_frame, text="Add to beginning (LPUSH)", 
+                       variable=self.position_var, value="start").pack(anchor=tk.W, padx=5, pady=2)
+        
+        # Value编辑
+        value_frame = ttk.LabelFrame(self.scrollable_frame, text="Value")
+        value_frame.pack(fill=tk.BOTH, expand=True, padx=10, pady=5)
+        
+        # 文本编辑器
+        text_frame = ttk.Frame(value_frame)
+        text_frame.pack(fill=tk.BOTH, expand=True, padx=5, pady=5)
+        
+        self.value_text = tk.Text(text_frame, wrap=tk.WORD, height=10)
+        self.value_text.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
+        
+        text_scroll = ttk.Scrollbar(text_frame, orient=tk.VERTICAL, command=self.value_text.yview)
+        text_scroll.pack(side=tk.RIGHT, fill=tk.Y)
+        self.value_text.configure(yscrollcommand=text_scroll.set)
+        
+        # 按钮
+        self._create_buttons()
+        
+        # 设置焦点
+        self.value_text.focus_set()
+    
+    def _create_buttons(self):
+        """创建按钮"""
+        btn_frame = ttk.Frame(self.scrollable_frame)
+        btn_frame.pack(fill=tk.X, padx=10, pady=10)
+        
+        ttk.Button(btn_frame, text="Add", command=self._add_item).pack(side=tk.RIGHT, padx=(5, 0))
+        ttk.Button(btn_frame, text="Cancel", command=lambda: self.close()).pack(side=tk.RIGHT)
+    
+    def _add_item(self):
+        """添加列表项"""
+        try:
+            value = self.value_text.get(1.0, tk.END).strip()
+            if not value:
+                messagebox.showwarning("Warning", "Value cannot be empty")
+                return
+            
+            redis_client = self.main_window.get_redis_client()
+            if not redis_client:
+                messagebox.showerror("Error", "No Redis connection available")
+                return
+            
+            redis_ops = RedisOperations(redis_client)
+            
+            # 根据位置选择添加到开头或结尾
+            if self.position_var.get() == "start":
+                redis_ops.list_push(self.key, value, left=True)  # LPUSH
+            else:
+                redis_ops.list_push(self.key, value, left=False)  # RPUSH
+            
+            messagebox.showinfo("Success", "List item added successfully!")
+            self.close(True)
+            
+        except Exception as e:
+            messagebox.showerror("Error", f"Failed to add list item: {e}")
+
+
+class AddSetDialog(BaseDialog):
+    """添加Set成员对话框"""
+    
+    def __init__(self, parent, key, main_window):
+        self.key = key
+        self.main_window = main_window
+        
+        super().__init__(parent, "Add Set Member", "600x400")
+        self._setup_ui()
+    
+    def _setup_ui(self):
+        """设置UI"""
+        # 说明
+        info_frame = ttk.Frame(self.scrollable_frame)
+        info_frame.pack(fill=tk.X, padx=10, pady=(10, 5))
+        
+        ttk.Label(info_frame, text=f"Add new member to set: {self.key}", 
+                 font=('Arial', 12, 'bold')).pack(anchor=tk.W)
+        ttk.Label(info_frame, text="Note: Duplicate members will be ignored", 
+                 font=('Arial', 10), foreground='#666666').pack(anchor=tk.W, pady=(2, 0))
+        
+        # Value编辑
+        value_frame = ttk.LabelFrame(self.scrollable_frame, text="Member Value")
+        value_frame.pack(fill=tk.BOTH, expand=True, padx=10, pady=5)
+        
+        # 文本编辑器
+        text_frame = ttk.Frame(value_frame)
+        text_frame.pack(fill=tk.BOTH, expand=True, padx=5, pady=5)
+        
+        self.value_text = tk.Text(text_frame, wrap=tk.WORD, height=10)
+        self.value_text.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
+        
+        text_scroll = ttk.Scrollbar(text_frame, orient=tk.VERTICAL, command=self.value_text.yview)
+        text_scroll.pack(side=tk.RIGHT, fill=tk.Y)
+        self.value_text.configure(yscrollcommand=text_scroll.set)
+        
+        # 批量添加选项
+        batch_frame = ttk.LabelFrame(self.scrollable_frame, text="Batch Add Options")
+        batch_frame.pack(fill=tk.X, padx=10, pady=5)
+        
+        self.batch_var = tk.BooleanVar()
+        ttk.Checkbutton(batch_frame, text="Add multiple members (one per line)", 
+                       variable=self.batch_var).pack(anchor=tk.W, padx=5, pady=5)
+        
+        # 按钮
+        self._create_buttons()
+        
+        # 设置焦点
+        self.value_text.focus_set()
+    
+    def _create_buttons(self):
+        """创建按钮"""
+        btn_frame = ttk.Frame(self.scrollable_frame)
+        btn_frame.pack(fill=tk.X, padx=10, pady=10)
+        
+        ttk.Button(btn_frame, text="Add", command=self._add_member).pack(side=tk.RIGHT, padx=(5, 0))
+        ttk.Button(btn_frame, text="Cancel", command=lambda: self.close()).pack(side=tk.RIGHT)
+    
+    def _add_member(self):
+        """添加集合成员"""
+        try:
+            value = self.value_text.get(1.0, tk.END).strip()
+            if not value:
+                messagebox.showwarning("Warning", "Value cannot be empty")
+                return
+            
+            redis_client = self.main_window.get_redis_client()
+            if not redis_client:
+                messagebox.showerror("Error", "No Redis connection available")
+                return
+            
+            redis_ops = RedisOperations(redis_client)
+            
+            if self.batch_var.get():
+                # 批量添加，按行分割
+                members = [line.strip() for line in value.split('\n') if line.strip()]
+                if not members:
+                    messagebox.showwarning("Warning", "No valid members to add")
+                    return
+                
+                result = redis_ops.set_add(self.key, *members)
+                messagebox.showinfo("Success", f"Added {result} new members to set (duplicates ignored)")
+            else:
+                # 单个添加
+                result = redis_ops.set_add(self.key, value)
+                if result:
+                    messagebox.showinfo("Success", "Set member added successfully!")
+                else:
+                    messagebox.showinfo("Info", "Member already exists in set")
+            
+            self.close(True)
+            
+        except Exception as e:
+            messagebox.showerror("Error", f"Failed to add set member: {e}")
+
+
+class AddZSetDialog(BaseDialog):
+    """添加ZSet成员对话框"""
+    
+    def __init__(self, parent, key, main_window):
+        self.key = key
+        self.main_window = main_window
+        
+        super().__init__(parent, "Add ZSet Member", "600x500")
+        self._setup_ui()
+    
+    def _setup_ui(self):
+        """设置UI"""
+        # 说明
+        info_frame = ttk.Frame(self.scrollable_frame)
+        info_frame.pack(fill=tk.X, padx=10, pady=(10, 5))
+        
+        ttk.Label(info_frame, text=f"Add new member to sorted set: {self.key}", 
+                 font=('Arial', 12, 'bold')).pack(anchor=tk.W)
+        
+        # Score编辑
+        score_frame = ttk.LabelFrame(self.scrollable_frame, text="Score")
+        score_frame.pack(fill=tk.X, padx=10, pady=(5, 5))
+        
+        self.score_var = tk.StringVar(value="0")
+        score_entry = ttk.Entry(score_frame, textvariable=self.score_var)
+        score_entry.pack(fill=tk.X, padx=5, pady=5)
+        
+        # Member编辑
+        member_frame = ttk.LabelFrame(self.scrollable_frame, text="Member")
+        member_frame.pack(fill=tk.BOTH, expand=True, padx=10, pady=5)
+        
+        # 文本编辑器
+        text_frame = ttk.Frame(member_frame)
+        text_frame.pack(fill=tk.BOTH, expand=True, padx=5, pady=5)
+        
+        self.member_text = tk.Text(text_frame, wrap=tk.WORD, height=8)
+        self.member_text.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
+        
+        text_scroll = ttk.Scrollbar(text_frame, orient=tk.VERTICAL, command=self.member_text.yview)
+        text_scroll.pack(side=tk.RIGHT, fill=tk.Y)
+        self.member_text.configure(yscrollcommand=text_scroll.set)
+        
+        # 按钮
+        self._create_buttons()
+        
+        # 设置焦点
+        score_entry.focus_set()
+    
+    def _create_buttons(self):
+        """创建按钮"""
+        btn_frame = ttk.Frame(self.scrollable_frame)
+        btn_frame.pack(fill=tk.X, padx=10, pady=10)
+        
+        ttk.Button(btn_frame, text="Add", command=self._add_member).pack(side=tk.RIGHT, padx=(5, 0))
+        ttk.Button(btn_frame, text="Cancel", command=lambda: self.close()).pack(side=tk.RIGHT)
+    
+    def _add_member(self):
+        """添加有序集合成员"""
+        try:
+            score_str = self.score_var.get().strip()
+            member = self.member_text.get(1.0, tk.END).strip()
+            
+            if not score_str:
+                messagebox.showwarning("Warning", "Score cannot be empty")
+                return
+            
+            if not member:
+                messagebox.showwarning("Warning", "Member cannot be empty")
+                return
+            
+            try:
+                score = float(score_str)
+            except ValueError:
+                messagebox.showerror("Error", "Score must be a valid number")
+                return
+            
+            redis_client = self.main_window.get_redis_client()
+            if not redis_client:
+                messagebox.showerror("Error", "No Redis connection available")
+                return
+            
+            redis_ops = RedisOperations(redis_client)
+            
+            # 添加成员
+            result = redis_ops.zset_add(self.key, {member: score})
+            if result:
+                messagebox.showinfo("Success", "ZSet member added successfully!")
+            else:
+                messagebox.showinfo("Info", "Member score updated (member already existed)")
+            
+            self.close(True)
+            
+        except Exception as e:
+            messagebox.showerror("Error", f"Failed to add zset member: {e}")
+
+
+class AddNewKeyDialog(BaseDialog):
+    """添加新键对话框"""
+    
+    def __init__(self, parent, main_window):
+        self.main_window = main_window
+        
+        super().__init__(parent, "Add New Key", "700x600")
+        self._setup_ui()
+    
+    def _setup_ui(self):
+        """设置UI"""
+        # 键名输入
+        key_frame = ttk.LabelFrame(self.scrollable_frame, text="Key Name")
+        key_frame.pack(fill=tk.X, padx=10, pady=(10, 5))
+        
+        self.key_var = tk.StringVar()
+        key_entry = ttk.Entry(key_frame, textvariable=self.key_var, font=('Arial', 11))
+        key_entry.pack(fill=tk.X, padx=5, pady=5)
+        
+        # 数据类型选择
+        type_frame = ttk.LabelFrame(self.scrollable_frame, text="Data Type")
+        type_frame.pack(fill=tk.X, padx=10, pady=5)
+        
+        self.type_var = tk.StringVar(value="string")
+        type_inner = ttk.Frame(type_frame)
+        type_inner.pack(fill=tk.X, padx=5, pady=5)
+        
+        # 数据类型单选按钮
+        ttk.Radiobutton(type_inner, text="String", variable=self.type_var, 
+                       value="string", command=self._on_type_change).pack(side=tk.LEFT, padx=(0, 15))
+        ttk.Radiobutton(type_inner, text="Hash", variable=self.type_var, 
+                       value="hash", command=self._on_type_change).pack(side=tk.LEFT, padx=(0, 15))
+        ttk.Radiobutton(type_inner, text="List", variable=self.type_var, 
+                       value="list", command=self._on_type_change).pack(side=tk.LEFT, padx=(0, 15))
+        ttk.Radiobutton(type_inner, text="Set", variable=self.type_var, 
+                       value="set", command=self._on_type_change).pack(side=tk.LEFT, padx=(0, 15))
+        ttk.Radiobutton(type_inner, text="ZSet", variable=self.type_var, 
+                       value="zset", command=self._on_type_change).pack(side=tk.LEFT)
+        
+        # TTL设置
+        ttl_frame = ttk.LabelFrame(self.scrollable_frame, text="TTL (Time To Live)")
+        ttl_frame.pack(fill=tk.X, padx=10, pady=5)
+        
+        ttl_inner = ttk.Frame(ttl_frame)
+        ttl_inner.pack(fill=tk.X, padx=5, pady=5)
+        
+        self.ttl_enabled = tk.BooleanVar()
+        ttk.Checkbutton(ttl_inner, text="Set TTL", variable=self.ttl_enabled).pack(side=tk.LEFT)
+        
+        self.ttl_var = tk.StringVar(value="3600")
+        ttl_entry = ttk.Entry(ttl_inner, textvariable=self.ttl_var, width=10)
+        ttl_entry.pack(side=tk.LEFT, padx=(10, 5))
+        ttk.Label(ttl_inner, text="seconds").pack(side=tk.LEFT)
+        
+        # 值输入区域
+        self.value_frame = ttk.LabelFrame(self.scrollable_frame, text="Value")
+        self.value_frame.pack(fill=tk.BOTH, expand=True, padx=10, pady=5)
+        
+        # 初始化为String类型的输入
+        self._setup_string_input()
+        
+        # 按钮
+        self._create_buttons()
+        
+        # 设置焦点
+        key_entry.focus_set()
+    
+    def _on_type_change(self):
+        """数据类型改变事件"""
+        # 清空当前值输入区域
+        for widget in self.value_frame.winfo_children():
+            widget.destroy()
+        
+        # 根据选择的类型设置相应的输入界面
+        data_type = self.type_var.get()
+        if data_type == "string":
+            self._setup_string_input()
+        elif data_type == "hash":
+            self._setup_hash_input()
+        elif data_type == "list":
+            self._setup_list_input()
+        elif data_type == "set":
+            self._setup_set_input()
+        elif data_type == "zset":
+            self._setup_zset_input()
+    
+    def _setup_string_input(self):
+        """设置String类型输入"""
+        # JSON格式化按钮
+        json_btn_frame = ttk.Frame(self.value_frame)
+        json_btn_frame.pack(fill=tk.X, padx=5, pady=5)
+        
+        ttk.Button(json_btn_frame, text="Format JSON", 
+                  command=self._format_json).pack(side=tk.LEFT, padx=(0, 5))
+        ttk.Button(json_btn_frame, text="Minify JSON", 
+                  command=self._minify_json).pack(side=tk.LEFT)
+        
+        # 文本输入
+        text_frame = ttk.Frame(self.value_frame)
+        text_frame.pack(fill=tk.BOTH, expand=True, padx=5, pady=5)
+        
+        self.string_text = tk.Text(text_frame, wrap=tk.WORD, height=12)
+        self.string_text.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
+        
+        string_scroll = ttk.Scrollbar(text_frame, orient=tk.VERTICAL, command=self.string_text.yview)
+        string_scroll.pack(side=tk.RIGHT, fill=tk.Y)
+        self.string_text.configure(yscrollcommand=string_scroll.set)
+    
+    def _setup_hash_input(self):
+        """设置Hash类型输入"""
+        # 说明
+        ttk.Label(self.value_frame, text="Enter hash fields (one per line): field=value", 
+                 font=('Arial', 10), foreground='#666666').pack(anchor=tk.W, padx=5, pady=(5, 0))
+        
+        # 示例
+        example_frame = ttk.Frame(self.value_frame)
+        example_frame.pack(fill=tk.X, padx=5, pady=2)
+        ttk.Label(example_frame, text="Example:", font=('Arial', 9, 'bold')).pack(side=tk.LEFT)
+        ttk.Label(example_frame, text="name=John Doe", font=('Arial', 9), foreground='#0066CC').pack(side=tk.LEFT, padx=(5, 0))
+        
+        # 文本输入
+        text_frame = ttk.Frame(self.value_frame)
+        text_frame.pack(fill=tk.BOTH, expand=True, padx=5, pady=5)
+        
+        self.hash_text = tk.Text(text_frame, wrap=tk.WORD, height=10)
+        self.hash_text.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
+        self.hash_text.insert(tk.END, "name=\nage=\nemail=")
+        
+        hash_scroll = ttk.Scrollbar(text_frame, orient=tk.VERTICAL, command=self.hash_text.yview)
+        hash_scroll.pack(side=tk.RIGHT, fill=tk.Y)
+        self.hash_text.configure(yscrollcommand=hash_scroll.set)
+    
+    def _setup_list_input(self):
+        """设置List类型输入"""
+        # 说明
+        ttk.Label(self.value_frame, text="Enter list items (one per line):", 
+                 font=('Arial', 10), foreground='#666666').pack(anchor=tk.W, padx=5, pady=(5, 0))
+        
+        # 文本输入
+        text_frame = ttk.Frame(self.value_frame)
+        text_frame.pack(fill=tk.BOTH, expand=True, padx=5, pady=5)
+        
+        self.list_text = tk.Text(text_frame, wrap=tk.WORD, height=10)
+        self.list_text.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
+        self.list_text.insert(tk.END, "item1\nitem2\nitem3")
+        
+        list_scroll = ttk.Scrollbar(text_frame, orient=tk.VERTICAL, command=self.list_text.yview)
+        list_scroll.pack(side=tk.RIGHT, fill=tk.Y)
+        self.list_text.configure(yscrollcommand=list_scroll.set)
+    
+    def _setup_set_input(self):
+        """设置Set类型输入"""
+        # 说明
+        ttk.Label(self.value_frame, text="Enter set members (one per line, duplicates will be ignored):", 
+                 font=('Arial', 10), foreground='#666666').pack(anchor=tk.W, padx=5, pady=(5, 0))
+        
+        # 文本输入
+        text_frame = ttk.Frame(self.value_frame)
+        text_frame.pack(fill=tk.BOTH, expand=True, padx=5, pady=5)
+        
+        self.set_text = tk.Text(text_frame, wrap=tk.WORD, height=10)
+        self.set_text.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
+        self.set_text.insert(tk.END, "member1\nmember2\nmember3")
+        
+        set_scroll = ttk.Scrollbar(text_frame, orient=tk.VERTICAL, command=self.set_text.yview)
+        set_scroll.pack(side=tk.RIGHT, fill=tk.Y)
+        self.set_text.configure(yscrollcommand=set_scroll.set)
+    
+    def _setup_zset_input(self):
+        """设置ZSet类型输入"""
+        # 说明
+        ttl_label = ttk.Label(self.value_frame, text="Enter sorted set members (one per line): score member", 
+                             font=('Arial', 10), foreground='#666666')
+        ttl_label.pack(anchor=tk.W, padx=5, pady=(5, 0))
+        
+        # 示例
+        example_frame = ttk.Frame(self.value_frame)
+        example_frame.pack(fill=tk.X, padx=5, pady=2)
+        ttk.Label(example_frame, text="Example:", font=('Arial', 9, 'bold')).pack(side=tk.LEFT)
+        ttk.Label(example_frame, text="100 player1", font=('Arial', 9), foreground='#0066CC').pack(side=tk.LEFT, padx=(5, 0))
+        
+        # 文本输入
+        text_frame = ttk.Frame(self.value_frame)
+        text_frame.pack(fill=tk.BOTH, expand=True, padx=5, pady=5)
+        
+        self.zset_text = tk.Text(text_frame, wrap=tk.WORD, height=10)
+        self.zset_text.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
+        self.zset_text.insert(tk.END, "100 player1\n90 player2\n80 player3")
+        
+        zset_scroll = ttk.Scrollbar(text_frame, orient=tk.VERTICAL, command=self.zset_text.yview)
+        zset_scroll.pack(side=tk.RIGHT, fill=tk.Y)
+        self.zset_text.configure(yscrollcommand=zset_scroll.set)
+    
+    def _create_buttons(self):
+        """创建按钮"""
+        btn_frame = ttk.Frame(self.scrollable_frame)
+        btn_frame.pack(fill=tk.X, padx=10, pady=10)
+        
+        ttk.Button(btn_frame, text="Create Key", command=self._create_key).pack(side=tk.RIGHT, padx=(5, 0))
+        ttk.Button(btn_frame, text="Cancel", command=lambda: self.close()).pack(side=tk.RIGHT)
+    
+    def _format_json(self):
+        """格式化JSON"""
+        if hasattr(self, 'string_text'):
+            try:
+                from ..utils.helpers import format_json
+                current_value = self.string_text.get(1.0, tk.END).strip()
+                formatted = format_json(current_value)
+                self.string_text.delete(1.0, tk.END)
+                self.string_text.insert(1.0, formatted)
+            except Exception as e:
+                messagebox.showerror("JSON Error", f"Failed to format JSON: {e}")
+    
+    def _minify_json(self):
+        """压缩JSON"""
+        if hasattr(self, 'string_text'):
+            try:
+                from ..utils.helpers import minify_json
+                current_value = self.string_text.get(1.0, tk.END).strip()
+                minified = minify_json(current_value)
+                self.string_text.delete(1.0, tk.END)
+                self.string_text.insert(1.0, minified)
+            except Exception as e:
+                messagebox.showerror("JSON Error", f"Failed to minify JSON: {e}")
+    
+    def _create_key(self):
+        """创建键"""
+        try:
+            key_name = self.key_var.get().strip()
+            if not key_name:
+                messagebox.showwarning("Warning", "Key name cannot be empty")
+                return
+            
+            redis_client = self.main_window.get_redis_client()
+            if not redis_client:
+                messagebox.showerror("Error", "No Redis connection available")
+                return
+            
+            # 检查键是否已存在
+            if redis_client.exists(key_name):
+                if not messagebox.askyesno("Key Exists", f"Key '{key_name}' already exists. Overwrite?"):
+                    return
+            
+            redis_ops = RedisOperations(redis_client)
+            data_type = self.type_var.get()
+            
+            # 根据数据类型创建键
+            if data_type == "string":
+                value = self.string_text.get(1.0, tk.END).strip()
+                redis_client.set(key_name, value)
+                
+            elif data_type == "hash":
+                hash_data = self._parse_hash_input()
+                if hash_data:
+                    redis_client.hset(key_name, mapping=hash_data)
+                else:
+                    messagebox.showwarning("Warning", "No valid hash fields provided")
+                    return
+                    
+            elif data_type == "list":
+                list_items = self._parse_list_input()
+                if list_items:
+                    redis_client.rpush(key_name, *list_items)
+                else:
+                    messagebox.showwarning("Warning", "No valid list items provided")
+                    return
+                    
+            elif data_type == "set":
+                set_members = self._parse_set_input()
+                if set_members:
+                    redis_client.sadd(key_name, *set_members)
+                else:
+                    messagebox.showwarning("Warning", "No valid set members provided")
+                    return
+                    
+            elif data_type == "zset":
+                zset_data = self._parse_zset_input()
+                if zset_data:
+                    redis_client.zadd(key_name, zset_data)
+                else:
+                    messagebox.showwarning("Warning", "No valid zset members provided")
+                    return
+            
+            # 设置TTL
+            if self.ttl_enabled.get():
+                try:
+                    ttl_seconds = int(self.ttl_var.get())
+                    if ttl_seconds > 0:
+                        redis_client.expire(key_name, ttl_seconds)
+                except ValueError:
+                    messagebox.showwarning("Warning", "Invalid TTL value, key created without TTL")
+            
+            messagebox.showinfo("Success", f"Key '{key_name}' created successfully!")
+            self.close(True)
+            
+        except Exception as e:
+            messagebox.showerror("Error", f"Failed to create key: {e}")
+    
+    def _parse_hash_input(self):
+        """解析Hash输入"""
+        try:
+            text = self.hash_text.get(1.0, tk.END).strip()
+            hash_data = {}
+            
+            for line in text.split('\n'):
+                line = line.strip()
+                if line and '=' in line:
+                    field, value = line.split('=', 1)
+                    field = field.strip()
+                    value = value.strip()
+                    if field:  # 允许空值
+                        hash_data[field] = value
+            
+            return hash_data
+        except Exception:
+            return {}
+    
+    def _parse_list_input(self):
+        """解析List输入"""
+        try:
+            text = self.list_text.get(1.0, tk.END).strip()
+            items = []
+            
+            for line in text.split('\n'):
+                line = line.strip()
+                if line:  # 忽略空行
+                    items.append(line)
+            
+            return items
+        except Exception:
+            return []
+    
+    def _parse_set_input(self):
+        """解析Set输入"""
+        try:
+            text = self.set_text.get(1.0, tk.END).strip()
+            members = []
+            
+            for line in text.split('\n'):
+                line = line.strip()
+                if line:  # 忽略空行
+                    members.append(line)
+            
+            return members
+        except Exception:
+            return []
+    
+    def _parse_zset_input(self):
+        """解析ZSet输入"""
+        try:
+            text = self.zset_text.get(1.0, tk.END).strip()
+            zset_data = {}
+            
+            for line in text.split('\n'):
+                line = line.strip()
+                if line:
+                    parts = line.split(' ', 1)
+                    if len(parts) == 2:
+                        try:
+                            score = float(parts[0])
+                            member = parts[1].strip()
+                            if member:
+                                zset_data[member] = score
+                        except ValueError:
+                            continue  # 忽略无效的分数
+            
+            return zset_data
+        except Exception:
+            return {}
     
     def _get_main_window(self):
         """获取主窗口实例"""

@@ -5,26 +5,56 @@ All notable changes to RedisM will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [1.0.1] - 2024-12-25
+## [1.0.2] - 2024-12-29
 
-### Added
-- ✅ **Test Connection Feature**: Implemented real connection testing with SSH tunnel support
-- ✅ **Connection Validation**: Comprehensive validation for Redis and SSH configurations
-- ✅ **Real-time Feedback**: Async connection testing with progress indication
+### 🐛 Fixed
+- **Add New Key Functionality**: Fixed Add New Key button not working after moving from right panel to left panel
+- **Method Access Path**: Corrected left panel's _add_new_key method to access right_panel.key_manager instead of key_manager
+- **Duplicate Method Definition**: Removed duplicate _add_new_key method definition in key_manager.py that was causing the first empty method to override the functional one
 
-### Improved
-- ✅ **File Selection**: Removed file type restrictions for SSH private key selection
-- ✅ **Default Values**: Fixed duplicate default values issue in connection editing
-- ✅ **User Experience**: Enhanced connection dialog with better error handling
+### 🔧 Optimized
+- **Project Structure**: Cleaned up project by removing unused temporary files:
+  - test_add_key.py
+  - test_functionality.py
+  - CLEANUP_SUMMARY.md
+  - PROJECT_STATUS.md
+  - STRUCTURE.md
+  - icon_placeholder.txt
+- **Code Organization**: Improved code maintainability and removed redundant files
 
-### Fixed
-- 🐛 **Duplicate Defaults**: Fixed issue where default values were filled twice when editing connections
-- 🐛 **Layout Consistency**: Resolved SSH authentication layout width inconsistencies
-- 🐛 **File Compatibility**: Improved private key file selection to support all file types
+### 📚 Documentation
+- **Complete README Rewrite**: Completely rewrote README.md with comprehensive documentation
+- **Feature Overview**: Added detailed feature descriptions with emojis and clear sections
+- **Installation Guide**: Provided step-by-step installation and setup instructions
+- **Usage Guide**: Added comprehensive usage guide with screenshots and examples
+- **Troubleshooting**: Added troubleshooting section for common issues
+- **Contributing Guide**: Added contribution guidelines and development setup
+- **Project Structure**: Updated project structure documentation
 
-## [1.0.0] - 2024-12-25
+### ✨ Enhanced
+- **Add New Key Feature**: Ensured complete support for all Redis data types (String, Hash, List, Set, ZSet)
+- **Advanced Features**: Confirmed TTL setting, key existence checking, and input validation work properly
+- **User Experience**: Optimized UI workflow and interaction patterns
 
-### Added
+## [1.0.1] - 2024-12-28
+
+### ✨ Added
+- **Complete Add New Key Feature**: Implemented comprehensive key creation for all Redis data types
+- **New Dialog Classes**: Added AddListDialog, AddSetDialog, AddZSetDialog for specific data types
+- **AddNewKeyDialog**: Created unified dialog supporting multi-type key creation with TTL settings
+- **UI Repositioning**: Moved Add New Key button from right panel to left panel for better UX
+
+### 🐛 Fixed
+- **Add Item Buttons**: Fixed non-functional Add Item buttons for List and Set data types
+- **Data Type Operations**: Resolved issues with adding and editing various data types
+
+### 📖 Documentation
+- **Feature Documentation**: Added ADD_ITEM_IMPROVEMENTS.md with detailed feature explanations
+- **Usage Instructions**: Updated user guides and operation instructions
+
+## [1.0.0] - 2024-12-27
+
+### 🎉 Initial Release
 - **Connection Management**: Multiple Redis connection configurations with save/load functionality
 - **SSH Tunnel Support**: Full SSH tunnel support with password and private key authentication
 - **Connection Testing**: Test connections before saving with detailed feedback
@@ -64,14 +94,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## Development Notes
 
 ### Architecture
-- **Single File Application**: All functionality consolidated in `redis_manager.py`
-- **Configuration Management**: Centralized config in `config.py`
+- **Modular Design**: Well-organized codebase with clear separation of concerns
+- **Configuration Management**: Centralized config in `src/config.py`
 - **Build Automation**: Streamlined build process with `build_python.sh`
+- **UI Components**: Separate modules for different UI panels and dialogs
 
-### Removed in 1.0.0
-- Unused `connection_manager.py` and `key_manager.py` modules
-- Test files and development utilities
-- Redundant build configurations
+### Project Evolution
+- **v1.0.0**: Initial monolithic design with single file application
+- **v1.0.1**: Modular refactoring with separate UI components and dialogs
+- **v1.0.2**: Bug fixes and documentation improvements
 
 ### Future Roadmap
 - Multi-platform support (Windows, Linux)
@@ -79,3 +110,5 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Advanced query builder
 - Data export/import functionality
 - Performance monitoring and analytics
+- Dark mode support
+- Internationalization (i18n)
