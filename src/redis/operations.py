@@ -13,8 +13,15 @@ class RedisOperations:
     def __init__(self, redis_client):
         self.redis_client = redis_client
     
-    def get_keys(self, pattern="*", max_keys=0, progress_callback=None):
+    def get_keys(self, pattern="*", max_keys=0, progress_callback=None, target_db=None):
         """获取键列表"""
+        # 如果指定了目标数据库，先切换到该数据库
+        if target_db is not None:
+            try:
+                self.redis_client.execute_command('SELECT', target_db)
+            except Exception as e:
+                print(f"Warning: Failed to select database {target_db}: {e}")
+        
         if max_keys == 0:
             # 无限制模式 - 使用流式加载
             return self._load_keys_streaming(pattern, progress_callback)

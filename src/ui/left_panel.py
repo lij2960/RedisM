@@ -291,12 +291,12 @@ class LeftPanel:
         # 更新连接列表显示
         self.refresh_connection_list()
         
+        # 更新数据库列表并搜索键（避免重复调用）
         self._update_db_list()
-        self.search_keys()
+        # search_keys会在_update_db_list触发的_on_db_change中被调用，所以这里不需要再调用
         
         # 刷新key manager显示Redis服务器信息
         self.main_window.right_panel.key_manager.clear_details()
-        self.main_window.right_panel.key_manager._show_welcome()
     
     def _on_connect_error(self, error):
         """连接错误回调"""
@@ -307,23 +307,95 @@ class LeftPanel:
     
     def _update_db_list(self):
         """更新数据库列表"""
+        # 临时解绑事件，避免在设置默认值时触发_on_db_change
+        self.db_combo.unbind('<<ComboboxSelected>>')
+        
         db_count = self.main_window.current_conn.get('db_count', DEFAULT_DB_COUNT)
         self.db_combo['values'] = [f"DB {i}" for i in range(db_count)]
         self.db_var.set("DB 0")
+        
+        # 重新绑定事件
+        self.db_combo.bind('<<ComboboxSelected>>', self._on_db_change)
+        
+        # 手动触发一次键搜索和服务器信息更新（因为设置DB 0不会触发事件了）
+        self.search_keys()
+        self.main_window.right_panel.key_manager._show_welcome()
     
     def _on_db_change(self, event):
         """数据库切换事件"""
         redis_client = self.main_window.get_redis_client()
-        if redis_client:
-            # 重置总键数估计
-            self.total_keys_estimate = None
+        if not redis_client:
+            return
+        
+        try:
             db_num = int(self.db_var.get().split()[1])
+            
+            # 切换数据库
             redis_client.execute_command('SELECT', db_num)
-            self.search_keys()
+            
+            # 清空当前的键数据和状态
+            self.current_keys = []
+            self.total_keys_estimate = None
+            self.keys_data = {}
+            self.group_data = {}
+            self.selected_line = None
+            self.expanded_groups = set()
+            self.tree_structure = {}
+            
+            # 清空键显示
+            self._clear_keys_display()
+            
+            # 更新状态显示
+            self.main_window.right_panel.update_status(f"Switched to database {db_num}, loading keys...")
+            
+            # 使用专门的数据库客户端搜索键
+            self.search_keys_with_db_client(db_num)
             
             # 刷新key manager显示以更新当前数据库信息
             self.main_window.right_panel.key_manager.clear_details()
-            self.main_window.right_panel.key_manager._show_welcome()
+            
+        except Exception as e:
+            self.main_window.right_panel.update_status(f"Failed to switch database: {e}")
+    
+    def search_keys_with_db_client(self, db_num):
+        """使用专门的数据库客户端搜索键"""
+        def progress_callback(current_count, total_count):
+            """进度回调函数"""
+            if total_count:
+                progress_text = f"Loading keys... {current_count}/{total_count} ({current_count/total_count*100:.1f}%)"
+            else:
+                progress_text = f"Loading keys... {current_count}"
+            
+            self.main_window.root.after(0, lambda: self.main_window.right_panel.update_status(progress_text))
+        
+        def search_thread():
+            try:
+                # 获取专门的数据库客户端
+                db_client = self.main_window.redis_conn.get_database_client(db_num)
+                if not db_client:
+                    raise Exception(f"Failed to create client for database {db_num}")
+                
+                pattern = self.search_var.get() or "*"
+                max_keys = self.main_window.current_conn.get('max_keys', DEFAULT_MAX_KEYS)
+                
+                self.main_window.root.after(0, lambda: self.main_window.right_panel.update_status("Initializing key loading..."))
+                
+                redis_ops = RedisOperations(db_client)
+                keys, total_keys = redis_ops.get_keys(pattern, max_keys, progress_callback)
+                
+                self.current_keys = keys
+                self.total_keys_estimate = total_keys
+                self.main_window.root.after(0, lambda: self._update_keys_tree(keys))
+                
+                # 关闭临时客户端
+                db_client.close()
+                
+            except Exception as e:
+                error_msg = str(e)
+                self.main_window.root.after(0, lambda msg=error_msg: 
+                    self.main_window.right_panel.update_status(f"Failed to get keys: {msg}"))
+        
+        threading.Thread(target=search_thread, daemon=True).start()
     
     def refresh_connection_list(self):
         """刷新连接列表"""
@@ -337,7 +409,7 @@ class LeftPanel:
             self.conn_listbox.insert(tk.END, display_name)
     
     # 键搜索和显示方法
-    def search_keys(self):
+    def search_keys(self, target_db=None):
         """搜索键"""
         redis_client = self.main_window.get_redis_client()
         if not redis_client:
@@ -346,9 +418,6 @@ class LeftPanel:
         # 检查连接状态，如果断开则尝试重连
         if not self.main_window.redis_conn.check_and_reconnect():
             return
-        
-        # 重置总键数估计
-        self.total_keys_estimate = None
         
         def progress_callback(current_count, total_count):
             """进度回调函数"""
@@ -367,7 +436,7 @@ class LeftPanel:
                 self.main_window.root.after(0, lambda: self.main_window.right_panel.update_status("Initializing key loading..."))
                 
                 redis_ops = RedisOperations(redis_client)
-                keys, total_keys = redis_ops.get_keys(pattern, max_keys, progress_callback)
+                keys, total_keys = redis_ops.get_keys(pattern, max_keys, progress_callback, target_db)
                 
                 self.current_keys = keys
                 self.total_keys_estimate = total_keys

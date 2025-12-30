@@ -356,6 +356,59 @@ class RedisConnection:
         self.keepalive_thread = threading.Thread(target=keepalive_worker, daemon=True)
         self.keepalive_thread.start()
     
+    def get_database_client(self, db_num):
+        """获取指定数据库的Redis客户端"""
+        if not self.redis_client or not self.current_conn:
+            return None
+        
+        try:
+            # 获取当前连接的参数
+            connection_kwargs = self.redis_client.connection_pool.connection_kwargs.copy()
+            
+            # 创建一个新的客户端，指定数据库
+            db_client = redis.Redis(
+                host=connection_kwargs.get('host'),
+                port=connection_kwargs.get('port'),
+                password=connection_kwargs.get('password'),
+                username=connection_kwargs.get('username'),
+                db=db_num,
+                decode_responses=True
+            )
+            
+            # 测试连接
+            db_client.ping()
+            return db_client
+            
+        except Exception as e:
+            print(f"Error creating database client for db {db_num}: {e}")
+            return None
+    def get_database_client(self, db_num):
+        """获取指定数据库的Redis客户端"""
+        if not self.redis_client or not self.current_conn:
+            return None
+        
+        try:
+            # 获取当前连接的参数
+            connection_kwargs = self.redis_client.connection_pool.connection_kwargs.copy()
+            
+            # 创建一个新的客户端，指定数据库
+            db_client = redis.Redis(
+                host=connection_kwargs.get('host'),
+                port=connection_kwargs.get('port'),
+                password=connection_kwargs.get('password'),
+                username=connection_kwargs.get('username'),
+                db=db_num,
+                decode_responses=True
+            )
+            
+            # 测试连接
+            db_client.ping()
+            return db_client
+            
+        except Exception as e:
+            print(f"Error creating database client for db {db_num}: {e}")
+            return None
+    
     def _stop_keepalive(self):
         """停止Redis连接保活"""
         self.keepalive_running = False
