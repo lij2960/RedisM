@@ -57,8 +57,10 @@ class BaseDialog(SearchMixin):
         # 设置几何属性
         self.dialog.geometry(f"{width}x{height}+{x}+{y}")
         
-        # 设置最小尺寸
-        self.dialog.minsize(width, height)
+        # 设置最小尺寸 - 确保有足够空间显示内容
+        min_width = max(400, width // 2)
+        min_height = max(300, height // 2)
+        self.dialog.minsize(min_width, min_height)
         
         # 允许调整大小
         self.dialog.resizable(True, True)
@@ -286,18 +288,50 @@ class BaseDialog(SearchMixin):
         """对话框大小变化事件处理"""
         # 只处理对话框本身的resize事件，忽略子组件的
         if event.widget == self.dialog:
+            # 更新Canvas滚动区域
+            if hasattr(self, 'canvas'):
+                self.dialog.after_idle(self._update_scroll_region)
+            
             # 通知子类处理resize事件
             if hasattr(self, '_handle_dialog_resize'):
                 self._handle_dialog_resize(event)
     
-    def create_auto_resize_text(self, parent, initial_text="", height=10, **kwargs):
-        """创建自动调整大小的文本组件"""
+    def _update_scroll_region(self):
+        """更新滚动区域"""
+        try:
+            if hasattr(self, 'canvas') and hasattr(self, 'scrollable_frame'):
+                self.canvas.configure(scrollregion=self.canvas.bbox("all"))
+        except Exception:
+            pass
+    
+    def create_simple_dialog_layout(self):
+        """创建简单的对话框布局 - 不使用Canvas滚动，专门用于编辑对话框"""
+        # 创建主容器，直接使用Frame而不是Canvas
+        self.main_container = ttk.Frame(self.dialog)
+        self.main_container.pack(fill=tk.BOTH, expand=True)
+        
+        # 配置grid权重，让内容可以扩展
+        self.main_container.grid_rowconfigure(0, weight=1)
+        self.main_container.grid_columnconfigure(0, weight=1)
+        
+        # 创建内容框架
+        self.content_frame = ttk.Frame(self.main_container)
+        self.content_frame.grid(row=0, column=0, sticky="nsew", padx=10, pady=10)
+        
+        # 配置内容框架的grid权重
+        self.content_frame.grid_rowconfigure(1, weight=1)  # 让第二行（文本区域）可扩展
+        self.content_frame.grid_columnconfigure(0, weight=1)
+        
+        return self.content_frame
+    
+    def create_auto_resize_text(self, parent, initial_text="", min_height=6, max_height=15, **kwargs):
+        """创建自动调整大小的文本组件 - 恢复原有功能"""
         # 创建文本框架
         text_frame = ttk.Frame(parent)
         text_frame.pack(fill=tk.BOTH, expand=True, padx=5, pady=5)
         
-        # 创建文本组件
-        text_widget = tk.Text(text_frame, wrap=tk.WORD, height=height, **kwargs)
+        # 创建文本组件 - 使用最小高度作为初始值
+        text_widget = tk.Text(text_frame, wrap=tk.WORD, height=min_height, **kwargs)
         text_widget.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
         
         # 插入初始文本
@@ -307,6 +341,33 @@ class BaseDialog(SearchMixin):
         # 创建滚动条
         text_scroll = ttk.Scrollbar(text_frame, orient=tk.VERTICAL, command=text_widget.yview)
         text_scroll.pack(side=tk.RIGHT, fill=tk.Y)
+        text_widget.configure(yscrollcommand=text_scroll.set)
+        
+        # 添加搜索功能
+        self.add_search_to_text_widget(text_widget, parent)
+        
+        return text_widget, text_frame
+    
+    def create_auto_resize_text_simple(self, parent, initial_text="", **kwargs):
+        """创建真正自适应的文本组件 - 使用grid布局"""
+        # 创建文本框架
+        text_frame = ttk.Frame(parent)
+        
+        # 配置grid权重
+        text_frame.grid_rowconfigure(0, weight=1)
+        text_frame.grid_columnconfigure(0, weight=1)
+        
+        # 创建文本组件 - 不设置固定高度，让grid管理
+        text_widget = tk.Text(text_frame, wrap=tk.WORD, **kwargs)
+        text_widget.grid(row=0, column=0, sticky="nsew")
+        
+        # 插入初始文本
+        if initial_text:
+            text_widget.insert(tk.END, initial_text)
+        
+        # 创建滚动条
+        text_scroll = ttk.Scrollbar(text_frame, orient=tk.VERTICAL, command=text_widget.yview)
+        text_scroll.grid(row=0, column=1, sticky="ns")
         text_widget.configure(yscrollcommand=text_scroll.set)
         
         # 添加搜索功能

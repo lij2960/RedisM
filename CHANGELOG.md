@@ -5,7 +5,56 @@ All notable changes to RedisM will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [1.0.2] - 2024-12-30
+## [1.0.3] - 2024-12-30
+
+### ✨ Added
+- **True Auto-Resize Dialogs**: Implemented SimpleDialog architecture for true auto-resize functionality
+  - Text areas now truly adapt to window size changes in real-time
+  - No more fixed height constraints - text areas expand/contract with window
+  - Proper grid weight configuration ensures optimal space utilization
+- **Migrated Edit Dialogs**: All main editing dialogs now use SimpleDialog architecture
+  - HashEditDialog: ✅ Migrated with full auto-resize
+  - SetEditDialog: ✅ Migrated with full auto-resize  
+  - ListEditDialog: ✅ Migrated with full auto-resize
+  - ZSetEditDialog: ✅ Migrated with full auto-resize
+- **Enhanced Search Integration**: Preserved Ctrl+F search functionality in all migrated dialogs
+- **Improved Default Sizes**: Adjusted dialog default window sizes for better user experience
+  - SetEditDialog: 600x400 → 800x500
+  - ListEditDialog: 600x400 → 800x500
+  - ZSetEditDialog: 600x500 → 800x500
+
+### 🏗️ Architecture
+- **SimpleDialog Class**: New dialog base class using pure grid layout without Canvas scrolling
+  - Three-tier layout structure (fixed + expandable + fixed sections)
+  - Direct grid layout management for better responsiveness
+  - Simplified event handling and size calculations
+- **Layout Management**: Proper grid weight configuration for true auto-resize
+  - Fixed sections: `weight=0` (headers, buttons)
+  - Expandable sections: `weight=1` (text areas)
+  - Consistent sticky="nsew" for proper expansion
+
+### 🎨 Enhanced
+- **User Experience**: Much better utilization of screen real estate
+  - Text areas automatically expand to fill available window space
+  - Resizing dialog windows immediately adjusts text area size
+  - Consistent auto-resize behavior across all migrated dialogs
+- **Performance**: Eliminated complex Canvas+scrolling framework interference
+- **Maintainability**: Cleaner, more maintainable dialog code structure
+
+### 🧹 Cleaned
+- **Project Structure**: Removed development process documentation files
+  - Deleted temporary development docs (ADD_ITEM_IMPROVEMENTS.md, etc.)
+  - Removed build artifacts (RedisM.dmg, create_icon.py)
+  - Cleaned up system files (.DS_Store)
+  - Removed PROJECT_SUMMARY.md (content integrated into README)
+- **Documentation**: Streamlined docs directory to essential files only
+
+### 📚 Documentation
+- **Updated README**: Comprehensive update to v1.0.3 with new features
+- **Architecture Documentation**: Added SimpleDialog architecture details
+- **User Guide**: Enhanced with auto-resize functionality descriptions
+
+## [1.0.2] - 2024-12-29
 
 ### 🆕 Added
 - **Ctrl+F Search Functionality**: Implemented comprehensive search functionality for all text display windows
@@ -22,11 +71,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **BaseDialog Improvements**: Enhanced with auto-resize text creation and search capabilities
 - **Dialog Responsiveness**: All dialog text areas now properly resize with window changes
 - **User Experience**: Consistent search experience across all text editing interfaces
+- **Auto-Adaptive Text Areas**: Text areas in editing dialogs now automatically adapt to window height
+  - Removed fixed height constraints from text components
+  - Text areas now fill available space and resize with window
+  - Improved space utilization for better editing experience
+  - More reasonable minimum window size limits (400x300 minimum)
 
 ### 🐛 Fixed
 - **Add New Key Functionality**: Fixed Add New Key button not working after moving from right panel to left panel
 - **Method Access Path**: Corrected left panel's _add_new_key method to access right_panel.key_manager instead of key_manager
 - **Duplicate Method Definition**: Removed duplicate _add_new_key method definition in key_manager.py that was causing the first empty method to override the functional one
+- **Text Area Auto-Resize (Root Cause Solution)**: Identified and solved the root cause of text area auto-resize issues
+  - **Root Cause**: BaseDialog's Canvas+scrolling framework interferes with tkinter's layout managers
+  - **Solution**: Created SimpleDialog class using pure grid layout without Canvas scrolling
+  - **Implementation**: HashEditDialog now uses SimpleDialog for true auto-resize functionality
+  - **Architecture**: Three-tier layout (fixed sections + expandable section) with proper grid weights
+  - **Result**: Text areas now truly adapt to window size changes using tkinter's native layout management
 
 ### 🔧 Optimized
 - **Project Structure**: Cleaned up project by removing unused temporary files:

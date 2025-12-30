@@ -1,10 +1,10 @@
-# RedisM v1.0.2
+# RedisM v1.0.3
 
 <div align="center">
 
 **现代化的Redis管理工具**
 
-[![Version](https://img.shields.io/badge/version-1.0.2-blue.svg)](#)
+[![Version](https://img.shields.io/badge/version-1.0.3-blue.svg)](#)
 [![Python](https://img.shields.io/badge/python-3.8+-green.svg)](https://python.org)
 [![Redis](https://img.shields.io/badge/Redis-5.0+-red.svg)](https://redis.io)
 [![Platform](https://img.shields.io/badge/platform-macOS%20%7C%20Linux%20%7C%20Windows-lightgrey.svg)](#)
@@ -40,9 +40,10 @@
 
 ### 🎨 用户界面
 - **现代设计**: 简洁美观的现代化界面设计
-- **响应式布局**: 自适应窗口大小的响应式界面布局
+- **响应式布局**: 自适应窗口大小的响应式界面布局，文本区域真正自适应窗口变化
 - **丰富交互**: 鼠标悬停效果、右键菜单、键盘快捷键
 - **用户友好**: 直观的操作流程和清晰的状态反馈
+- **搜索功能**: 所有文本编辑窗口支持Ctrl+F快速搜索
 
 ### 💻 开发工具
 - **命令行界面**: 内置完整的Redis命令行，支持所有Redis命令
@@ -236,6 +237,14 @@ RedisM/
 
 ## 📝 更新日志
 
+### v1.0.3 (2024-12-30)
+- ✨ **新增**: 对话框文本区域真正自适应窗口大小功能
+- 🎨 **改进**: 所有编辑对话框（Hash、Set、List、ZSet）现在支持文本区域随窗口大小实时调整
+- 🔍 **增强**: 所有文本编辑窗口支持Ctrl+F快速搜索功能
+- 📏 **优化**: 调整Set、List、ZSet编辑对话框的默认窗口大小，提供更好的编辑体验
+- 🧹 **整理**: 清理项目结构，删除开发过程中的临时文件和文档
+- 🏗️ **架构**: 引入SimpleDialog架构，为编辑对话框提供更好的布局管理
+
 ### v1.0.2 (2024-12-29)
 - 🐛 **修复**: Add New Key按钮移动到左侧面板后无法正常工作的问题
 - 🔧 **优化**: 清理代码结构，删除无用的临时文件和测试文件
@@ -343,10 +352,10 @@ python main.py
 
 <div align="center">
 
-**RedisM v1.0.2** - 让Redis管理变得简单而优雅 ✨
+**RedisM v1.0.3** - 让Redis管理变得简单而优雅 ✨
 
 Made with ❤️ for Redis developers worldwide
 
-[⬆️ 回到顶部](#redism-v102)
+[⬆️ 回到顶部](#redism-v103)
 
 </div>

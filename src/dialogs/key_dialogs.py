@@ -7,13 +7,14 @@ import tkinter as tk
 from tkinter import ttk, messagebox
 
 from .base_dialog import BaseDialog
+from .simple_dialog import SimpleDialog
 from ..config import *
 from ..utils.helpers import format_json, minify_json
 from ..redis.operations import RedisOperations
 
 
-class HashEditDialog(BaseDialog):
-    """Hash字段编辑对话框"""
+class HashEditDialog(SimpleDialog):
+    """Hash字段编辑对话框 - 使用SimpleDialog实现真正的自适应"""
     
     def __init__(self, parent, key, field, value, main_window):
         self.key = key
@@ -26,55 +27,52 @@ class HashEditDialog(BaseDialog):
     
     def _setup_ui(self):
         """设置UI"""
-        # Field编辑
-        field_frame = ttk.LabelFrame(self.scrollable_frame, text="Field (Key)")
-        field_frame.pack(fill=tk.X, padx=10, pady=(10, 5))
+        # 固定区域：Field编辑
+        field_section = self.create_fixed_section(0)
+        field_frame = ttk.LabelFrame(field_section, text="Field (Key)")
+        field_frame.grid(row=0, column=0, sticky="ew", padx=0, pady=0)
+        field_frame.grid_columnconfigure(0, weight=1)
         
         self.field_var = tk.StringVar(value=self.field)
         field_entry = ttk.Entry(field_frame, textvariable=self.field_var)
         field_entry.pack(fill=tk.X, padx=5, pady=5)
         
-        # Value编辑
-        value_frame = ttk.LabelFrame(self.scrollable_frame, text="Value")
-        value_frame.pack(fill=tk.BOTH, expand=True, padx=10, pady=5)
+        # 可扩展区域：Value编辑
+        value_section = self.create_expandable_section(1)
+        value_frame = ttk.LabelFrame(value_section, text="Value")
+        value_frame.grid(row=0, column=0, sticky="nsew", padx=0, pady=0)
+        value_frame.grid_rowconfigure(1, weight=1)  # 文本区域可扩展
+        value_frame.grid_columnconfigure(0, weight=1)
         
-        # JSON格式化按钮
-        self._create_json_buttons(value_frame)
-        
-        # 文本编辑器
-        self._create_text_editor(value_frame)
-        
-        # 按钮
-        self._create_buttons()
-        
-        # 设置焦点
-        field_entry.focus_set()
-        field_entry.select_range(0, tk.END)
-    
-    def _create_json_buttons(self, parent):
-        """创建JSON格式化按钮"""
-        json_btn_frame = ttk.Frame(parent)
-        json_btn_frame.pack(fill=tk.X, padx=5, pady=5)
+        # JSON格式化按钮 - 固定高度
+        json_btn_frame = ttk.Frame(value_frame)
+        json_btn_frame.grid(row=0, column=0, sticky="ew", padx=5, pady=5)
         
         ttk.Button(json_btn_frame, text="Format JSON", 
                   command=self._format_json).pack(side=tk.LEFT, padx=(0, 5))
         ttk.Button(json_btn_frame, text="Minify JSON", 
                   command=self._minify_json).pack(side=tk.LEFT)
-    
-    def _create_text_editor(self, parent):
-        """创建文本编辑器"""
-        self.value_text, self.text_frame = self.create_auto_resize_text(parent, str(self.value), height=20)
         
-        # 存储文本组件引用以便在resize时使用
-        self._text_widgets = [self.value_text]
-    
-    def _create_buttons(self):
-        """创建按钮"""
-        btn_frame = ttk.Frame(self.scrollable_frame)
-        btn_frame.pack(fill=tk.X, padx=10, pady=10)
+        # 文本编辑器 - 自适应高度
+        text_container = ttk.Frame(value_frame)
+        text_container.grid(row=1, column=0, sticky="nsew", padx=5, pady=5)
+        text_container.grid_rowconfigure(0, weight=1)  # 文本区域
+        text_container.grid_rowconfigure(1, weight=0)  # 搜索按钮区域
+        text_container.grid_columnconfigure(0, weight=1)
+        
+        self.value_text, self.text_frame = self.create_auto_text(text_container, str(self.value))
+        
+        # 固定区域：按钮
+        button_section = self.create_fixed_section(2)
+        btn_frame = ttk.Frame(button_section)
+        btn_frame.grid(row=0, column=0, sticky="ew", padx=0, pady=0)
         
         ttk.Button(btn_frame, text="Save", command=self._save_changes).pack(side=tk.RIGHT, padx=(5, 0))
         ttk.Button(btn_frame, text="Cancel", command=lambda: self.close()).pack(side=tk.RIGHT)
+        
+        # 设置焦点
+        field_entry.focus_set()
+        field_entry.select_range(0, tk.END)
     
     def _format_json(self):
         """格式化JSON"""
@@ -102,12 +100,7 @@ class HashEditDialog(BaseDialog):
     
     def _save_changes(self):
         """保存更改"""
-        new_field = self.field_var.get().strip()
         new_value = self.value_text.get(1.0, tk.END).strip()
-        
-        if not new_field:
-            messagebox.showerror("Error", "Field name cannot be empty")
-            return
         
         try:
             # 获取Redis客户端
@@ -118,80 +111,73 @@ class HashEditDialog(BaseDialog):
             
             redis_ops = RedisOperations(redis_client)
             
-            # 如果字段名改变了，先删除旧字段
-            if new_field != self.field:
-                redis_ops.hash_delete(self.key, self.field)
+            # 删除旧值，添加新值
+            redis_ops.set_remove(self.key, self.old_value)
+            redis_ops.set_add(self.key, new_value)
             
-            # 设置新值
-            redis_ops.hash_set(self.key, new_field, new_value)
-            
-            messagebox.showinfo("Success", "Hash field updated successfully!")
+            messagebox.showinfo("Success", "Set value updated successfully!")
             self.close(True)
             
         except Exception as e:
-            messagebox.showerror("Error", f"Failed to update hash field: {e}")
-    
-    def _get_main_window(self):
-        """获取主窗口实例"""
-        # 通过父窗口层级找到主窗口
-        parent = self.parent
-        while parent and not hasattr(parent, 'get_redis_client'):
-            parent = parent.master if hasattr(parent, 'master') else None
-        return parent
+            messagebox.showerror("Error", f"Failed to update set value: {e}")
 
 
-class SetEditDialog(BaseDialog):
-    """Set成员编辑对话框"""
+class SetEditDialog(SimpleDialog):
+    """Set成员编辑对话框 - 使用SimpleDialog实现真正的自适应"""
     
     def __init__(self, parent, key, old_value, main_window):
         self.key = key
         self.old_value = old_value
         self.main_window = main_window
         
-        super().__init__(parent, "Edit Set Value", "600x400")
+        super().__init__(parent, "Edit Set Value", "800x500")
         self._setup_ui()
     
     def _setup_ui(self):
         """设置UI"""
-        # Value编辑
-        value_frame = ttk.LabelFrame(self.scrollable_frame, text="Value")
-        value_frame.pack(fill=tk.BOTH, expand=True, padx=10, pady=10)
+        # 固定区域：标题信息
+        header_section = self.create_fixed_section(0)
+        header_frame = ttk.Frame(header_section)
+        header_frame.grid(row=0, column=0, sticky="ew", padx=0, pady=0)
         
-        # JSON格式化按钮
-        self._create_json_buttons(value_frame)
+        ttk.Label(header_frame, text=f"Editing Set Member: {self.key}", 
+                 font=('Arial', 12, 'bold')).pack(anchor=tk.W, padx=5, pady=5)
         
-        # 文本编辑器
-        self._create_text_editor(value_frame)
+        # 可扩展区域：Value编辑
+        value_section = self.create_expandable_section(1)  # 使用row 1作为可扩展区域
+        value_frame = ttk.LabelFrame(value_section, text="Value")
+        value_frame.grid(row=0, column=0, sticky="nsew", padx=0, pady=0)
+        value_frame.grid_rowconfigure(1, weight=1)  # 文本区域可扩展
+        value_frame.grid_columnconfigure(0, weight=1)
         
-        # 按钮
-        self._create_buttons()
-        
-        self.value_text.focus_set()
-    
-    def _create_json_buttons(self, parent):
-        """创建JSON格式化按钮"""
-        json_btn_frame = ttk.Frame(parent)
-        json_btn_frame.pack(fill=tk.X, padx=5, pady=5)
+        # JSON格式化按钮 - 固定高度
+        json_btn_frame = ttk.Frame(value_frame)
+        json_btn_frame.grid(row=0, column=0, sticky="ew", padx=5, pady=5)
         
         ttk.Button(json_btn_frame, text="Format JSON", 
                   command=self._format_json).pack(side=tk.LEFT, padx=(0, 5))
         ttk.Button(json_btn_frame, text="Minify JSON", 
                   command=self._minify_json).pack(side=tk.LEFT)
-    
-    def _create_text_editor(self, parent):
-        """创建文本编辑器"""
-        self.value_text, self.text_frame = self.create_auto_resize_text(parent, str(self.old_value), height=12)
         
-        # 存储文本组件引用以便在resize时使用
-        self._text_widgets = [self.value_text]
-    
-    def _create_buttons(self):
-        """创建按钮"""
-        btn_frame = ttk.Frame(self.scrollable_frame)
-        btn_frame.pack(fill=tk.X, padx=10, pady=10)
+        # 文本编辑器 - 自适应高度
+        text_container = ttk.Frame(value_frame)
+        text_container.grid(row=1, column=0, sticky="nsew", padx=5, pady=5)
+        text_container.grid_rowconfigure(0, weight=1)  # 文本区域
+        text_container.grid_rowconfigure(1, weight=0)  # 搜索按钮区域
+        text_container.grid_columnconfigure(0, weight=1)
+        
+        self.value_text, self.text_frame = self.create_auto_text(text_container, str(self.old_value))
+        
+        # 固定区域：按钮
+        button_section = self.create_fixed_section(2)  # 使用row 2作为底部按钮
+        btn_frame = ttk.Frame(button_section)
+        btn_frame.grid(row=0, column=0, sticky="ew", padx=0, pady=0)
         
         ttk.Button(btn_frame, text="Save", command=self._save_changes).pack(side=tk.RIGHT, padx=(5, 0))
         ttk.Button(btn_frame, text="Cancel", command=lambda: self.close()).pack(side=tk.RIGHT)
+        
+        # 设置焦点
+        self.value_text.focus_set()
     
     def _format_json(self):
         """格式化JSON"""
@@ -249,8 +235,8 @@ class SetEditDialog(BaseDialog):
         return parent
 
 
-class ListEditDialog(BaseDialog):
-    """List元素编辑对话框"""
+class ListEditDialog(SimpleDialog):
+    """List元素编辑对话框 - 使用SimpleDialog实现真正的自适应"""
     
     def __init__(self, parent, key, index, value, main_window):
         self.key = key
@@ -258,56 +244,53 @@ class ListEditDialog(BaseDialog):
         self.value = value
         self.main_window = main_window
         
-        super().__init__(parent, "Edit List Item", "600x400")
+        super().__init__(parent, "Edit List Item", "800x500")
         self._setup_ui()
     
     def _setup_ui(self):
         """设置UI"""
-        # Index显示
-        index_frame = ttk.LabelFrame(self.scrollable_frame, text="Index")
-        index_frame.pack(fill=tk.X, padx=10, pady=(10, 5))
+        # 固定区域：Index显示
+        index_section = self.create_fixed_section(0)
+        index_frame = ttk.LabelFrame(index_section, text="Index")
+        index_frame.grid(row=0, column=0, sticky="ew", padx=0, pady=0)
         
         ttk.Label(index_frame, text=f"Index: {self.index}").pack(anchor=tk.W, padx=5, pady=5)
         
-        # Value编辑
-        value_frame = ttk.LabelFrame(self.scrollable_frame, text="Value")
-        value_frame.pack(fill=tk.BOTH, expand=True, padx=10, pady=5)
+        # 可扩展区域：Value编辑
+        value_section = self.create_expandable_section(1)
+        value_frame = ttk.LabelFrame(value_section, text="Value")
+        value_frame.grid(row=0, column=0, sticky="nsew", padx=0, pady=0)
+        value_frame.grid_rowconfigure(1, weight=1)  # 文本区域可扩展
+        value_frame.grid_columnconfigure(0, weight=1)
         
-        # JSON格式化按钮
-        self._create_json_buttons(value_frame)
-        
-        # 文本编辑器
-        self._create_text_editor(value_frame)
-        
-        # 按钮
-        self._create_buttons()
-        
-        self.value_text.focus_set()
-    
-    def _create_json_buttons(self, parent):
-        """创建JSON格式化按钮"""
-        json_btn_frame = ttk.Frame(parent)
-        json_btn_frame.pack(fill=tk.X, padx=5, pady=5)
+        # JSON格式化按钮 - 固定高度
+        json_btn_frame = ttk.Frame(value_frame)
+        json_btn_frame.grid(row=0, column=0, sticky="ew", padx=5, pady=5)
         
         ttk.Button(json_btn_frame, text="Format JSON", 
                   command=self._format_json).pack(side=tk.LEFT, padx=(0, 5))
         ttk.Button(json_btn_frame, text="Minify JSON", 
                   command=self._minify_json).pack(side=tk.LEFT)
-    
-    def _create_text_editor(self, parent):
-        """创建文本编辑器"""
-        self.value_text, self.text_frame = self.create_auto_resize_text(parent, str(self.value), height=12)
         
-        # 存储文本组件引用以便在resize时使用
-        self._text_widgets = [self.value_text]
-    
-    def _create_buttons(self):
-        """创建按钮"""
-        btn_frame = ttk.Frame(self.scrollable_frame)
-        btn_frame.pack(fill=tk.X, padx=10, pady=10)
+        # 文本编辑器 - 自适应高度
+        text_container = ttk.Frame(value_frame)
+        text_container.grid(row=1, column=0, sticky="nsew", padx=5, pady=5)
+        text_container.grid_rowconfigure(0, weight=1)  # 文本区域
+        text_container.grid_rowconfigure(1, weight=0)  # 搜索按钮区域
+        text_container.grid_columnconfigure(0, weight=1)
+        
+        self.value_text, self.text_frame = self.create_auto_text(text_container, str(self.value))
+        
+        # 固定区域：按钮
+        button_section = self.create_fixed_section(2)
+        btn_frame = ttk.Frame(button_section)
+        btn_frame.grid(row=0, column=0, sticky="ew", padx=0, pady=0)
         
         ttk.Button(btn_frame, text="Save", command=self._save_changes).pack(side=tk.RIGHT, padx=(5, 0))
         ttk.Button(btn_frame, text="Cancel", command=lambda: self.close()).pack(side=tk.RIGHT)
+        
+        # 设置焦点
+        self.value_text.focus_set()
     
     def _format_json(self):
         """格式化JSON"""
@@ -364,8 +347,8 @@ class ListEditDialog(BaseDialog):
         return parent
 
 
-class ZSetEditDialog(BaseDialog):
-    """ZSet成员编辑对话框"""
+class ZSetEditDialog(SimpleDialog):
+    """ZSet成员编辑对话框 - 使用SimpleDialog实现真正的自适应"""
     
     def __init__(self, parent, key, member, score, main_window):
         self.key = key
@@ -373,59 +356,57 @@ class ZSetEditDialog(BaseDialog):
         self.score = score
         self.main_window = main_window
         
-        super().__init__(parent, "Edit ZSet Member", "600x500")
+        super().__init__(parent, "Edit ZSet Member", "800x500")
         self._setup_ui()
     
     def _setup_ui(self):
         """设置UI"""
-        # Score编辑
-        score_frame = ttk.LabelFrame(self.scrollable_frame, text="Score")
-        score_frame.pack(fill=tk.X, padx=10, pady=(10, 5))
+        # 固定区域：Score编辑
+        score_section = self.create_fixed_section(0)
+        score_frame = ttk.LabelFrame(score_section, text="Score")
+        score_frame.grid(row=0, column=0, sticky="ew", padx=0, pady=0)
+        score_frame.grid_columnconfigure(0, weight=1)
         
         self.score_var = tk.StringVar(value=str(self.score))
         score_entry = ttk.Entry(score_frame, textvariable=self.score_var)
         score_entry.pack(fill=tk.X, padx=5, pady=5)
         
-        # Member编辑
-        member_frame = ttk.LabelFrame(self.scrollable_frame, text="Member")
-        member_frame.pack(fill=tk.BOTH, expand=True, padx=10, pady=5)
+        # 可扩展区域：Member编辑
+        member_section = self.create_expandable_section(1)
+        member_frame = ttk.LabelFrame(member_section, text="Member")
+        member_frame.grid(row=0, column=0, sticky="nsew", padx=0, pady=0)
+        member_frame.grid_rowconfigure(1, weight=1)  # 文本区域可扩展
+        member_frame.grid_columnconfigure(0, weight=1)
         
-        # JSON格式化按钮
-        self._create_json_buttons(member_frame)
-        
-        # 文本编辑器
-        self._create_text_editor(member_frame)
-        
-        # 按钮
-        self._create_buttons()
-        
-        score_entry.focus_set()
-        score_entry.select_range(0, tk.END)
-    
-    def _create_json_buttons(self, parent):
-        """创建JSON格式化按钮"""
-        json_btn_frame = ttk.Frame(parent)
-        json_btn_frame.pack(fill=tk.X, padx=5, pady=5)
+        # JSON格式化按钮 - 固定高度
+        json_btn_frame = ttk.Frame(member_frame)
+        json_btn_frame.grid(row=0, column=0, sticky="ew", padx=5, pady=5)
         
         ttk.Button(json_btn_frame, text="Format JSON", 
                   command=self._format_json).pack(side=tk.LEFT, padx=(0, 5))
         ttk.Button(json_btn_frame, text="Minify JSON", 
                   command=self._minify_json).pack(side=tk.LEFT)
-    
-    def _create_text_editor(self, parent):
-        """创建文本编辑器"""
-        self.member_text, self.text_frame = self.create_auto_resize_text(parent, str(self.member), height=10)
         
-        # 存储文本组件引用以便在resize时使用
-        self._text_widgets = [self.member_text]
-    
-    def _create_buttons(self):
-        """创建按钮"""
-        btn_frame = ttk.Frame(self.scrollable_frame)
-        btn_frame.pack(fill=tk.X, padx=10, pady=10)
+        # 文本编辑器 - 自适应高度
+        text_container = ttk.Frame(member_frame)
+        text_container.grid(row=1, column=0, sticky="nsew", padx=5, pady=5)
+        text_container.grid_rowconfigure(0, weight=1)  # 文本区域
+        text_container.grid_rowconfigure(1, weight=0)  # 搜索按钮区域
+        text_container.grid_columnconfigure(0, weight=1)
+        
+        self.member_text, self.text_frame = self.create_auto_text(text_container, str(self.member))
+        
+        # 固定区域：按钮
+        button_section = self.create_fixed_section(2)
+        btn_frame = ttk.Frame(button_section)
+        btn_frame.grid(row=0, column=0, sticky="ew", padx=0, pady=0)
         
         ttk.Button(btn_frame, text="Save", command=self._save_changes).pack(side=tk.RIGHT, padx=(5, 0))
         ttk.Button(btn_frame, text="Cancel", command=lambda: self.close()).pack(side=tk.RIGHT)
+        
+        # 设置焦点
+        score_entry.focus_set()
+        score_entry.select_range(0, tk.END)
     
     def _format_json(self):
         """格式化JSON"""
@@ -498,7 +479,7 @@ class AddHashDialog(BaseDialog):
     
     def _setup_ui(self):
         """设置UI"""
-        # Field编辑
+        # Field编辑 - 固定高度
         field_frame = ttk.LabelFrame(self.scrollable_frame, text="Field (Key)")
         field_frame.pack(fill=tk.X, padx=10, pady=(10, 5))
         
@@ -506,17 +487,17 @@ class AddHashDialog(BaseDialog):
         field_entry = ttk.Entry(field_frame, textvariable=self.field_var)
         field_entry.pack(fill=tk.X, padx=5, pady=5)
         
-        # Value编辑
+        # Value编辑 - 让文本区域占用剩余空间
         value_frame = ttk.LabelFrame(self.scrollable_frame, text="Value")
         value_frame.pack(fill=tk.BOTH, expand=True, padx=10, pady=5)
         
-        # JSON格式化按钮
+        # JSON格式化按钮 - 固定高度
         self._create_json_buttons(value_frame)
         
-        # 文本编辑器
+        # 文本编辑器 - 自适应高度
         self._create_text_editor(value_frame)
         
-        # 按钮
+        # 按钮 - 固定高度
         self._create_buttons()
         
         # 设置焦点
@@ -534,7 +515,7 @@ class AddHashDialog(BaseDialog):
     
     def _create_text_editor(self, parent):
         """创建文本编辑器"""
-        self.value_text, self.text_frame = self.create_auto_resize_text(parent, "", height=20)
+        self.value_text, self.text_frame = self.create_auto_resize_text(parent, "", min_height=6, max_height=15)
         
         # 存储文本组件引用以便在resize时使用
         self._text_widgets = [self.value_text]
@@ -611,14 +592,14 @@ class AddListDialog(BaseDialog):
     
     def _setup_ui(self):
         """设置UI"""
-        # 说明
+        # 说明 - 固定高度
         info_frame = ttk.Frame(self.scrollable_frame)
         info_frame.pack(fill=tk.X, padx=10, pady=(10, 5))
         
         ttk.Label(info_frame, text=f"Add new item to list: {self.key}", 
                  font=('Arial', 12, 'bold')).pack(anchor=tk.W)
         
-        # 位置选择
+        # 位置选择 - 固定高度
         position_frame = ttk.LabelFrame(self.scrollable_frame, text="Position")
         position_frame.pack(fill=tk.X, padx=10, pady=(5, 5))
         
@@ -628,17 +609,17 @@ class AddListDialog(BaseDialog):
         ttk.Radiobutton(position_frame, text="Add to beginning (LPUSH)", 
                        variable=self.position_var, value="start").pack(anchor=tk.W, padx=5, pady=2)
         
-        # Value编辑
+        # Value编辑 - 让文本区域占用剩余空间
         value_frame = ttk.LabelFrame(self.scrollable_frame, text="Value")
         value_frame.pack(fill=tk.BOTH, expand=True, padx=10, pady=5)
         
-        # 文本编辑器
-        self.value_text, self.text_frame = self.create_auto_resize_text(value_frame, "", height=10)
+        # 文本编辑器 - 自适应高度
+        self.value_text, self.text_frame = self.create_auto_resize_text(value_frame, "", min_height=5, max_height=10)
         
         # 存储文本组件引用以便在resize时使用
         self._text_widgets = [self.value_text]
         
-        # 按钮
+        # 按钮 - 固定高度
         self._create_buttons()
         
         # 设置焦点
@@ -692,7 +673,7 @@ class AddSetDialog(BaseDialog):
     
     def _setup_ui(self):
         """设置UI"""
-        # 说明
+        # 说明 - 固定高度
         info_frame = ttk.Frame(self.scrollable_frame)
         info_frame.pack(fill=tk.X, padx=10, pady=(10, 5))
         
@@ -701,17 +682,17 @@ class AddSetDialog(BaseDialog):
         ttk.Label(info_frame, text="Note: Duplicate members will be ignored", 
                  font=('Arial', 10), foreground='#666666').pack(anchor=tk.W, pady=(2, 0))
         
-        # Value编辑
+        # Value编辑 - 让文本区域占用大部分空间
         value_frame = ttk.LabelFrame(self.scrollable_frame, text="Member Value")
         value_frame.pack(fill=tk.BOTH, expand=True, padx=10, pady=5)
         
-        # 文本编辑器
-        self.value_text, self.text_frame = self.create_auto_resize_text(value_frame, "", height=10)
+        # 文本编辑器 - 自适应高度
+        self.value_text, self.text_frame = self.create_auto_resize_text(value_frame, "", min_height=5, max_height=10)
         
         # 存储文本组件引用以便在resize时使用
         self._text_widgets = [self.value_text]
         
-        # 批量添加选项
+        # 批量添加选项 - 固定高度
         batch_frame = ttk.LabelFrame(self.scrollable_frame, text="Batch Add Options")
         batch_frame.pack(fill=tk.X, padx=10, pady=5)
         
@@ -719,7 +700,7 @@ class AddSetDialog(BaseDialog):
         ttk.Checkbutton(batch_frame, text="Add multiple members (one per line)", 
                        variable=self.batch_var).pack(anchor=tk.W, padx=5, pady=5)
         
-        # 按钮
+        # 按钮 - 固定高度
         self._create_buttons()
         
         # 设置焦点
@@ -783,14 +764,14 @@ class AddZSetDialog(BaseDialog):
     
     def _setup_ui(self):
         """设置UI"""
-        # 说明
+        # 说明 - 固定高度
         info_frame = ttk.Frame(self.scrollable_frame)
         info_frame.pack(fill=tk.X, padx=10, pady=(10, 5))
         
         ttk.Label(info_frame, text=f"Add new member to sorted set: {self.key}", 
                  font=('Arial', 12, 'bold')).pack(anchor=tk.W)
         
-        # Score编辑
+        # Score编辑 - 固定高度
         score_frame = ttk.LabelFrame(self.scrollable_frame, text="Score")
         score_frame.pack(fill=tk.X, padx=10, pady=(5, 5))
         
@@ -798,17 +779,17 @@ class AddZSetDialog(BaseDialog):
         score_entry = ttk.Entry(score_frame, textvariable=self.score_var)
         score_entry.pack(fill=tk.X, padx=5, pady=5)
         
-        # Member编辑
+        # Member编辑 - 让文本区域占用剩余空间
         member_frame = ttk.LabelFrame(self.scrollable_frame, text="Member")
         member_frame.pack(fill=tk.BOTH, expand=True, padx=10, pady=5)
         
-        # 文本编辑器
-        self.member_text, self.text_frame = self.create_auto_resize_text(member_frame, "", height=8)
+        # 文本编辑器 - 自适应高度
+        self.member_text, self.text_frame = self.create_auto_resize_text(member_frame, "", min_height=4, max_height=8)
         
         # 存储文本组件引用以便在resize时使用
         self._text_widgets = [self.member_text]
         
-        # 按钮
+        # 按钮 - 固定高度
         self._create_buttons()
         
         # 设置焦点
@@ -964,7 +945,7 @@ class AddNewKeyDialog(BaseDialog):
                   command=self._minify_json).pack(side=tk.LEFT)
         
         # 文本输入
-        self.string_text, self.string_text_frame = self.create_auto_resize_text(self.value_frame, "", height=12)
+        self.string_text, self.string_text_frame = self.create_auto_resize_text(self.value_frame, "", min_height=6, max_height=12)
         
         # 存储文本组件引用以便在resize时使用
         self._text_widgets = [self.string_text]
@@ -982,7 +963,7 @@ class AddNewKeyDialog(BaseDialog):
         ttk.Label(example_frame, text="name=John Doe", font=('Arial', 9), foreground='#0066CC').pack(side=tk.LEFT, padx=(5, 0))
         
         # 文本输入
-        self.hash_text, self.hash_text_frame = self.create_auto_resize_text(self.value_frame, "name=\nage=\nemail=", height=10)
+        self.hash_text, self.hash_text_frame = self.create_auto_resize_text(self.value_frame, "name=\nage=\nemail=", min_height=5, max_height=10)
         
         # 存储文本组件引用以便在resize时使用
         self._text_widgets = [self.hash_text]
@@ -994,7 +975,7 @@ class AddNewKeyDialog(BaseDialog):
                  font=('Arial', 10), foreground='#666666').pack(anchor=tk.W, padx=5, pady=(5, 0))
         
         # 文本输入
-        self.list_text, self.list_text_frame = self.create_auto_resize_text(self.value_frame, "item1\nitem2\nitem3", height=10)
+        self.list_text, self.list_text_frame = self.create_auto_resize_text(self.value_frame, "item1\nitem2\nitem3", min_height=5, max_height=10)
         
         # 存储文本组件引用以便在resize时使用
         self._text_widgets = [self.list_text]
@@ -1006,7 +987,7 @@ class AddNewKeyDialog(BaseDialog):
                  font=('Arial', 10), foreground='#666666').pack(anchor=tk.W, padx=5, pady=(5, 0))
         
         # 文本输入
-        self.set_text, self.set_text_frame = self.create_auto_resize_text(self.value_frame, "member1\nmember2\nmember3", height=10)
+        self.set_text, self.set_text_frame = self.create_auto_resize_text(self.value_frame, "member1\nmember2\nmember3", min_height=5, max_height=10)
         
         # 存储文本组件引用以便在resize时使用
         self._text_widgets = [self.set_text]
@@ -1025,7 +1006,7 @@ class AddNewKeyDialog(BaseDialog):
         ttk.Label(example_frame, text="100 player1", font=('Arial', 9), foreground='#0066CC').pack(side=tk.LEFT, padx=(5, 0))
         
         # 文本输入
-        self.zset_text, self.zset_text_frame = self.create_auto_resize_text(self.value_frame, "100 player1\n90 player2\n80 player3", height=10)
+        self.zset_text, self.zset_text_frame = self.create_auto_resize_text(self.value_frame, "100 player1\n90 player2\n80 player3", min_height=5, max_height=10)
         
         # 存储文本组件引用以便在resize时使用
         self._text_widgets = [self.zset_text]
