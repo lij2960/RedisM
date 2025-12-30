@@ -63,16 +63,10 @@ class HashEditDialog(BaseDialog):
     
     def _create_text_editor(self, parent):
         """创建文本编辑器"""
-        text_frame = ttk.Frame(parent)
-        text_frame.pack(fill=tk.BOTH, expand=True, padx=5, pady=5)
+        self.value_text, self.text_frame = self.create_auto_resize_text(parent, str(self.value), height=20)
         
-        self.value_text = tk.Text(text_frame, wrap=tk.WORD, height=20)
-        self.value_text.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
-        self.value_text.insert(tk.END, str(self.value))
-        
-        text_scroll = ttk.Scrollbar(text_frame, orient=tk.VERTICAL, command=self.value_text.yview)
-        text_scroll.pack(side=tk.RIGHT, fill=tk.Y)
-        self.value_text.configure(yscrollcommand=text_scroll.set)
+        # 存储文本组件引用以便在resize时使用
+        self._text_widgets = [self.value_text]
     
     def _create_buttons(self):
         """创建按钮"""
@@ -186,16 +180,10 @@ class SetEditDialog(BaseDialog):
     
     def _create_text_editor(self, parent):
         """创建文本编辑器"""
-        text_frame = ttk.Frame(parent)
-        text_frame.pack(fill=tk.BOTH, expand=True, padx=5, pady=5)
+        self.value_text, self.text_frame = self.create_auto_resize_text(parent, str(self.old_value), height=12)
         
-        self.value_text = tk.Text(text_frame, wrap=tk.WORD, height=12)
-        self.value_text.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
-        self.value_text.insert(tk.END, str(self.old_value))
-        
-        text_scroll = ttk.Scrollbar(text_frame, orient=tk.VERTICAL, command=self.value_text.yview)
-        text_scroll.pack(side=tk.RIGHT, fill=tk.Y)
-        self.value_text.configure(yscrollcommand=text_scroll.set)
+        # 存储文本组件引用以便在resize时使用
+        self._text_widgets = [self.value_text]
     
     def _create_buttons(self):
         """创建按钮"""
@@ -308,16 +296,10 @@ class ListEditDialog(BaseDialog):
     
     def _create_text_editor(self, parent):
         """创建文本编辑器"""
-        text_frame = ttk.Frame(parent)
-        text_frame.pack(fill=tk.BOTH, expand=True, padx=5, pady=5)
+        self.value_text, self.text_frame = self.create_auto_resize_text(parent, str(self.value), height=12)
         
-        self.value_text = tk.Text(text_frame, wrap=tk.WORD, height=12)
-        self.value_text.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
-        self.value_text.insert(tk.END, str(self.value))
-        
-        text_scroll = ttk.Scrollbar(text_frame, orient=tk.VERTICAL, command=self.value_text.yview)
-        text_scroll.pack(side=tk.RIGHT, fill=tk.Y)
-        self.value_text.configure(yscrollcommand=text_scroll.set)
+        # 存储文本组件引用以便在resize时使用
+        self._text_widgets = [self.value_text]
     
     def _create_buttons(self):
         """创建按钮"""
@@ -432,16 +414,10 @@ class ZSetEditDialog(BaseDialog):
     
     def _create_text_editor(self, parent):
         """创建文本编辑器"""
-        text_frame = ttk.Frame(parent)
-        text_frame.pack(fill=tk.BOTH, expand=True, padx=5, pady=5)
+        self.member_text, self.text_frame = self.create_auto_resize_text(parent, str(self.member), height=10)
         
-        self.member_text = tk.Text(text_frame, wrap=tk.WORD, height=10)
-        self.member_text.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
-        self.member_text.insert(tk.END, str(self.member))
-        
-        text_scroll = ttk.Scrollbar(text_frame, orient=tk.VERTICAL, command=self.member_text.yview)
-        text_scroll.pack(side=tk.RIGHT, fill=tk.Y)
-        self.member_text.configure(yscrollcommand=text_scroll.set)
+        # 存储文本组件引用以便在resize时使用
+        self._text_widgets = [self.member_text]
     
     def _create_buttons(self):
         """创建按钮"""
@@ -558,15 +534,10 @@ class AddHashDialog(BaseDialog):
     
     def _create_text_editor(self, parent):
         """创建文本编辑器"""
-        text_frame = ttk.Frame(parent)
-        text_frame.pack(fill=tk.BOTH, expand=True, padx=5, pady=5)
+        self.value_text, self.text_frame = self.create_auto_resize_text(parent, "", height=20)
         
-        self.value_text = tk.Text(text_frame, wrap=tk.WORD, height=20)
-        self.value_text.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
-        
-        text_scroll = ttk.Scrollbar(text_frame, orient=tk.VERTICAL, command=self.value_text.yview)
-        text_scroll.pack(side=tk.RIGHT, fill=tk.Y)
-        self.value_text.configure(yscrollcommand=text_scroll.set)
+        # 存储文本组件引用以便在resize时使用
+        self._text_widgets = [self.value_text]
     
     def _create_buttons(self):
         """创建按钮"""
@@ -662,15 +633,10 @@ class AddListDialog(BaseDialog):
         value_frame.pack(fill=tk.BOTH, expand=True, padx=10, pady=5)
         
         # 文本编辑器
-        text_frame = ttk.Frame(value_frame)
-        text_frame.pack(fill=tk.BOTH, expand=True, padx=5, pady=5)
+        self.value_text, self.text_frame = self.create_auto_resize_text(value_frame, "", height=10)
         
-        self.value_text = tk.Text(text_frame, wrap=tk.WORD, height=10)
-        self.value_text.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
-        
-        text_scroll = ttk.Scrollbar(text_frame, orient=tk.VERTICAL, command=self.value_text.yview)
-        text_scroll.pack(side=tk.RIGHT, fill=tk.Y)
-        self.value_text.configure(yscrollcommand=text_scroll.set)
+        # 存储文本组件引用以便在resize时使用
+        self._text_widgets = [self.value_text]
         
         # 按钮
         self._create_buttons()
@@ -740,15 +706,10 @@ class AddSetDialog(BaseDialog):
         value_frame.pack(fill=tk.BOTH, expand=True, padx=10, pady=5)
         
         # 文本编辑器
-        text_frame = ttk.Frame(value_frame)
-        text_frame.pack(fill=tk.BOTH, expand=True, padx=5, pady=5)
+        self.value_text, self.text_frame = self.create_auto_resize_text(value_frame, "", height=10)
         
-        self.value_text = tk.Text(text_frame, wrap=tk.WORD, height=10)
-        self.value_text.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
-        
-        text_scroll = ttk.Scrollbar(text_frame, orient=tk.VERTICAL, command=self.value_text.yview)
-        text_scroll.pack(side=tk.RIGHT, fill=tk.Y)
-        self.value_text.configure(yscrollcommand=text_scroll.set)
+        # 存储文本组件引用以便在resize时使用
+        self._text_widgets = [self.value_text]
         
         # 批量添加选项
         batch_frame = ttk.LabelFrame(self.scrollable_frame, text="Batch Add Options")
@@ -842,15 +803,10 @@ class AddZSetDialog(BaseDialog):
         member_frame.pack(fill=tk.BOTH, expand=True, padx=10, pady=5)
         
         # 文本编辑器
-        text_frame = ttk.Frame(member_frame)
-        text_frame.pack(fill=tk.BOTH, expand=True, padx=5, pady=5)
+        self.member_text, self.text_frame = self.create_auto_resize_text(member_frame, "", height=8)
         
-        self.member_text = tk.Text(text_frame, wrap=tk.WORD, height=8)
-        self.member_text.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
-        
-        text_scroll = ttk.Scrollbar(text_frame, orient=tk.VERTICAL, command=self.member_text.yview)
-        text_scroll.pack(side=tk.RIGHT, fill=tk.Y)
-        self.member_text.configure(yscrollcommand=text_scroll.set)
+        # 存储文本组件引用以便在resize时使用
+        self._text_widgets = [self.member_text]
         
         # 按钮
         self._create_buttons()
@@ -911,6 +867,7 @@ class AddNewKeyDialog(BaseDialog):
     
     def __init__(self, parent, main_window):
         self.main_window = main_window
+        self._text_widgets = []  # 初始化文本组件列表
         
         super().__init__(parent, "Add New Key", "700x600")
         self._setup_ui()
@@ -979,6 +936,9 @@ class AddNewKeyDialog(BaseDialog):
         for widget in self.value_frame.winfo_children():
             widget.destroy()
         
+        # 清空文本组件引用
+        self._text_widgets = []
+        
         # 根据选择的类型设置相应的输入界面
         data_type = self.type_var.get()
         if data_type == "string":
@@ -1004,15 +964,10 @@ class AddNewKeyDialog(BaseDialog):
                   command=self._minify_json).pack(side=tk.LEFT)
         
         # 文本输入
-        text_frame = ttk.Frame(self.value_frame)
-        text_frame.pack(fill=tk.BOTH, expand=True, padx=5, pady=5)
+        self.string_text, self.string_text_frame = self.create_auto_resize_text(self.value_frame, "", height=12)
         
-        self.string_text = tk.Text(text_frame, wrap=tk.WORD, height=12)
-        self.string_text.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
-        
-        string_scroll = ttk.Scrollbar(text_frame, orient=tk.VERTICAL, command=self.string_text.yview)
-        string_scroll.pack(side=tk.RIGHT, fill=tk.Y)
-        self.string_text.configure(yscrollcommand=string_scroll.set)
+        # 存储文本组件引用以便在resize时使用
+        self._text_widgets = [self.string_text]
     
     def _setup_hash_input(self):
         """设置Hash类型输入"""
@@ -1027,16 +982,10 @@ class AddNewKeyDialog(BaseDialog):
         ttk.Label(example_frame, text="name=John Doe", font=('Arial', 9), foreground='#0066CC').pack(side=tk.LEFT, padx=(5, 0))
         
         # 文本输入
-        text_frame = ttk.Frame(self.value_frame)
-        text_frame.pack(fill=tk.BOTH, expand=True, padx=5, pady=5)
+        self.hash_text, self.hash_text_frame = self.create_auto_resize_text(self.value_frame, "name=\nage=\nemail=", height=10)
         
-        self.hash_text = tk.Text(text_frame, wrap=tk.WORD, height=10)
-        self.hash_text.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
-        self.hash_text.insert(tk.END, "name=\nage=\nemail=")
-        
-        hash_scroll = ttk.Scrollbar(text_frame, orient=tk.VERTICAL, command=self.hash_text.yview)
-        hash_scroll.pack(side=tk.RIGHT, fill=tk.Y)
-        self.hash_text.configure(yscrollcommand=hash_scroll.set)
+        # 存储文本组件引用以便在resize时使用
+        self._text_widgets = [self.hash_text]
     
     def _setup_list_input(self):
         """设置List类型输入"""
@@ -1045,16 +994,10 @@ class AddNewKeyDialog(BaseDialog):
                  font=('Arial', 10), foreground='#666666').pack(anchor=tk.W, padx=5, pady=(5, 0))
         
         # 文本输入
-        text_frame = ttk.Frame(self.value_frame)
-        text_frame.pack(fill=tk.BOTH, expand=True, padx=5, pady=5)
+        self.list_text, self.list_text_frame = self.create_auto_resize_text(self.value_frame, "item1\nitem2\nitem3", height=10)
         
-        self.list_text = tk.Text(text_frame, wrap=tk.WORD, height=10)
-        self.list_text.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
-        self.list_text.insert(tk.END, "item1\nitem2\nitem3")
-        
-        list_scroll = ttk.Scrollbar(text_frame, orient=tk.VERTICAL, command=self.list_text.yview)
-        list_scroll.pack(side=tk.RIGHT, fill=tk.Y)
-        self.list_text.configure(yscrollcommand=list_scroll.set)
+        # 存储文本组件引用以便在resize时使用
+        self._text_widgets = [self.list_text]
     
     def _setup_set_input(self):
         """设置Set类型输入"""
@@ -1063,16 +1006,10 @@ class AddNewKeyDialog(BaseDialog):
                  font=('Arial', 10), foreground='#666666').pack(anchor=tk.W, padx=5, pady=(5, 0))
         
         # 文本输入
-        text_frame = ttk.Frame(self.value_frame)
-        text_frame.pack(fill=tk.BOTH, expand=True, padx=5, pady=5)
+        self.set_text, self.set_text_frame = self.create_auto_resize_text(self.value_frame, "member1\nmember2\nmember3", height=10)
         
-        self.set_text = tk.Text(text_frame, wrap=tk.WORD, height=10)
-        self.set_text.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
-        self.set_text.insert(tk.END, "member1\nmember2\nmember3")
-        
-        set_scroll = ttk.Scrollbar(text_frame, orient=tk.VERTICAL, command=self.set_text.yview)
-        set_scroll.pack(side=tk.RIGHT, fill=tk.Y)
-        self.set_text.configure(yscrollcommand=set_scroll.set)
+        # 存储文本组件引用以便在resize时使用
+        self._text_widgets = [self.set_text]
     
     def _setup_zset_input(self):
         """设置ZSet类型输入"""
@@ -1088,16 +1025,10 @@ class AddNewKeyDialog(BaseDialog):
         ttk.Label(example_frame, text="100 player1", font=('Arial', 9), foreground='#0066CC').pack(side=tk.LEFT, padx=(5, 0))
         
         # 文本输入
-        text_frame = ttk.Frame(self.value_frame)
-        text_frame.pack(fill=tk.BOTH, expand=True, padx=5, pady=5)
+        self.zset_text, self.zset_text_frame = self.create_auto_resize_text(self.value_frame, "100 player1\n90 player2\n80 player3", height=10)
         
-        self.zset_text = tk.Text(text_frame, wrap=tk.WORD, height=10)
-        self.zset_text.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
-        self.zset_text.insert(tk.END, "100 player1\n90 player2\n80 player3")
-        
-        zset_scroll = ttk.Scrollbar(text_frame, orient=tk.VERTICAL, command=self.zset_text.yview)
-        zset_scroll.pack(side=tk.RIGHT, fill=tk.Y)
-        self.zset_text.configure(yscrollcommand=zset_scroll.set)
+        # 存储文本组件引用以便在resize时使用
+        self._text_widgets = [self.zset_text]
     
     def _create_buttons(self):
         """创建按钮"""

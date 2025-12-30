@@ -272,6 +272,10 @@ class KeyManager:
         ttk.Button(format_frame, text="Minify JSON", 
                   command=lambda: self._minify_json_value()).pack(side=tk.LEFT)
         
+        # 搜索按钮
+        ttk.Button(format_frame, text="🔍 Search (Ctrl+F)", 
+                  command=lambda: self._show_search_dialog()).pack(side=tk.RIGHT)
+        
         # 文本编辑器
         text_frame = ttk.Frame(parent)
         text_frame.pack(fill=tk.BOTH, expand=True, padx=5, pady=5)
@@ -283,6 +287,13 @@ class KeyManager:
         value_scroll = ttk.Scrollbar(text_frame, orient=tk.VERTICAL, command=self.value_text.yview)
         value_scroll.pack(side=tk.RIGHT, fill=tk.Y)
         self.value_text.configure(yscrollcommand=value_scroll.set)
+        
+        # 绑定Ctrl+F快捷键
+        self.value_text.bind('<Control-f>', lambda e: self._show_search_dialog())
+        self.value_text.bind('<Control-F>', lambda e: self._show_search_dialog())
+        
+        # 确保文本框能接收焦点和键盘事件
+        self.value_text.focus_set()
     
     def _create_action_buttons(self, key, key_type):
         """创建操作按钮"""
@@ -861,3 +872,108 @@ class KeyManager:
             messagebox.showerror("JSON Error", str(e))
         except Exception as e:
             messagebox.showerror("Error", f"Failed to minify JSON: {e}")
+    
+    def _show_search_dialog(self):
+        """显示搜索对话框"""
+        if not hasattr(self, 'value_text'):
+            return
+        
+        # 创建搜索对话框
+        search_dialog = tk.Toplevel(self.main_window.root)
+        search_dialog.title("Search Text")
+        search_dialog.geometry("400x120")
+        search_dialog.transient(self.main_window.root)
+        search_dialog.grab_set()
+        
+        # 居中显示
+        search_dialog.update_idletasks()
+        x = (search_dialog.winfo_screenwidth() // 2) - (400 // 2)
+        y = (search_dialog.winfo_screenheight() // 2) - (120 // 2)
+        search_dialog.geometry(f"400x120+{x}+{y}")
+        
+        # 搜索输入
+        search_frame = ttk.Frame(search_dialog)
+        search_frame.pack(fill=tk.X, padx=10, pady=10)
+        
+        ttk.Label(search_frame, text="Search for:").pack(anchor=tk.W)
+        search_var = tk.StringVar()
+        search_entry = ttk.Entry(search_frame, textvariable=search_var)
+        search_entry.pack(fill=tk.X, pady=(5, 0))
+        
+        # 按钮框架
+        btn_frame = ttk.Frame(search_dialog)
+        btn_frame.pack(fill=tk.X, padx=10, pady=5)
+        
+        # 搜索状态
+        status_var = tk.StringVar()
+        status_label = ttk.Label(btn_frame, textvariable=status_var, foreground='#666666')
+        status_label.pack(side=tk.LEFT)
+        
+        # 按钮
+        ttk.Button(btn_frame, text="Find Next", 
+                  command=lambda: self._find_text(search_var.get(), status_var, True)).pack(side=tk.RIGHT, padx=(5, 0))
+        ttk.Button(btn_frame, text="Find Previous", 
+                  command=lambda: self._find_text(search_var.get(), status_var, False)).pack(side=tk.RIGHT, padx=(5, 0))
+        ttk.Button(btn_frame, text="Close", 
+                  command=search_dialog.destroy).pack(side=tk.RIGHT, padx=(5, 0))
+        
+        # 绑定回车键
+        search_entry.bind('<Return>', lambda e: self._find_text(search_var.get(), status_var, True))
+        search_entry.bind('<Shift-Return>', lambda e: self._find_text(search_var.get(), status_var, False))
+        
+        # 设置焦点
+        search_entry.focus_set()
+        
+        # 存储搜索状态
+        self.search_start_pos = "1.0"
+    
+    def _find_text(self, search_text, status_var, forward=True):
+        """在文本中查找"""
+        if not search_text or not hasattr(self, 'value_text'):
+            status_var.set("Please enter search text")
+            return
+        
+        # 清除之前的高亮
+        self.value_text.tag_remove("search_highlight", "1.0", tk.END)
+        
+        # 获取当前光标位置
+        current_pos = self.value_text.index(tk.INSERT)
+        
+        # 搜索文本
+        if forward:
+            # 向前搜索
+            pos = self.value_text.search(search_text, current_pos, tk.END, nocase=True)
+            if not pos:
+                # 从头开始搜索
+                pos = self.value_text.search(search_text, "1.0", current_pos, nocase=True)
+                if pos:
+                    status_var.set("Search wrapped to beginning")
+                else:
+                    status_var.set("Text not found")
+                    return
+        else:
+            # 向后搜索
+            pos = self.value_text.search(search_text, current_pos, "1.0", backwards=True, nocase=True)
+            if not pos:
+                # 从末尾开始搜索
+                pos = self.value_text.search(search_text, tk.END, current_pos, backwards=True, nocase=True)
+                if pos:
+                    status_var.set("Search wrapped to end")
+                else:
+                    status_var.set("Text not found")
+                    return
+        
+        # 高亮找到的文本
+        end_pos = f"{pos}+{len(search_text)}c"
+        self.value_text.tag_add("search_highlight", pos, end_pos)
+        self.value_text.tag_config("search_highlight", background="yellow", foreground="black")
+        
+        # 移动光标并滚动到可见位置
+        self.value_text.mark_set(tk.INSERT, end_pos)
+        self.value_text.see(pos)
+        
+        # 更新状态
+        status_var.set(f"Found at {pos}")
+        
+        # 确保文本框有焦点
+        self.value_text.focus_set()

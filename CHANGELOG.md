@@ -5,7 +5,23 @@ All notable changes to RedisM will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [1.0.2] - 2024-12-29
+## [1.0.2] - 2024-12-30
+
+### 🆕 Added
+- **Ctrl+F Search Functionality**: Implemented comprehensive search functionality for all text display windows
+  - String value display window now supports Ctrl+F search with real-time highlighting
+  - All dialog text areas (Hash, List, Set, ZSet editing and creation) support Ctrl+F search
+  - Search dialog with Find Next/Previous navigation and status display
+  - Case-insensitive search with automatic wrapping
+  - Yellow highlighting of search results with auto-scroll to matches
+- **Auto-Resize Text Areas**: Dialog text areas now automatically fill the window and adapt when manually resized
+- **Search UI Components**: Added search buttons and visual feedback for better user experience
+
+### 🔧 Enhanced
+- **SearchMixin Class**: Created reusable search functionality mixin for text widgets
+- **BaseDialog Improvements**: Enhanced with auto-resize text creation and search capabilities
+- **Dialog Responsiveness**: All dialog text areas now properly resize with window changes
+- **User Experience**: Consistent search experience across all text editing interfaces
 
 ### 🐛 Fixed
 - **Add New Key Functionality**: Fixed Add New Key button not working after moving from right panel to left panel

@@ -5,9 +5,10 @@
 
 import tkinter as tk
 from tkinter import ttk
+from .search_mixin import SearchMixin
 
 
-class BaseDialog:
+class BaseDialog(SearchMixin):
     """基础对话框类"""
     
     def __init__(self, parent, title="Dialog", size="600x400"):
@@ -61,6 +62,9 @@ class BaseDialog:
         
         # 允许调整大小
         self.dialog.resizable(True, True)
+        
+        # 绑定窗口大小变化事件，用于自动调整内容
+        self.dialog.bind('<Configure>', self._on_dialog_resize)
     
     def _create_scrollable_frame(self):
         """创建可滚动框架 - macOS优化版本"""
@@ -277,3 +281,35 @@ class BaseDialog:
         self.result = result
         self._unbind_mousewheel()
         self.dialog.destroy()
+    
+    def _on_dialog_resize(self, event):
+        """对话框大小变化事件处理"""
+        # 只处理对话框本身的resize事件，忽略子组件的
+        if event.widget == self.dialog:
+            # 通知子类处理resize事件
+            if hasattr(self, '_handle_dialog_resize'):
+                self._handle_dialog_resize(event)
+    
+    def create_auto_resize_text(self, parent, initial_text="", height=10, **kwargs):
+        """创建自动调整大小的文本组件"""
+        # 创建文本框架
+        text_frame = ttk.Frame(parent)
+        text_frame.pack(fill=tk.BOTH, expand=True, padx=5, pady=5)
+        
+        # 创建文本组件
+        text_widget = tk.Text(text_frame, wrap=tk.WORD, height=height, **kwargs)
+        text_widget.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
+        
+        # 插入初始文本
+        if initial_text:
+            text_widget.insert(tk.END, initial_text)
+        
+        # 创建滚动条
+        text_scroll = ttk.Scrollbar(text_frame, orient=tk.VERTICAL, command=text_widget.yview)
+        text_scroll.pack(side=tk.RIGHT, fill=tk.Y)
+        text_widget.configure(yscrollcommand=text_scroll.set)
+        
+        # 添加搜索功能
+        self.add_search_to_text_widget(text_widget, parent)
+        
+        return text_widget, text_frame
