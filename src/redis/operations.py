@@ -13,24 +13,27 @@ class RedisOperations:
     def __init__(self, redis_client):
         self.redis_client = redis_client
     
-    def get_keys(self, pattern="*", max_keys=0):
+    def get_keys(self, pattern="*", max_keys=0, progress_callback=None):
         """获取键列表"""
         if max_keys == 0:
             # 无限制模式 - 使用流式加载
-            return self._load_keys_streaming(pattern)
+            return self._load_keys_streaming(pattern, progress_callback)
         else:
             # 限制模式 - 快速加载指定数量
             keys = []
             for key in self.redis_client.scan_iter(match=pattern, count=1000):
                 keys.append(key)
+                if progress_callback:
+                    progress_callback(len(keys), max_keys)
                 if len(keys) >= max_keys:
                     break
             return keys, None
     
-    def _load_keys_streaming(self, pattern):
+    def _load_keys_streaming(self, pattern, progress_callback=None):
         """流式加载键"""
         keys = []
         count = 0
+        batch_size = 1000  # 每批处理的键数量
         
         # 获取当前数据库的总键数
         try:
@@ -51,9 +54,17 @@ class RedisOperations:
             keys.append(key)
             count += 1
             
+            # 每批次更新进度
+            if progress_callback and count % batch_size == 0:
+                progress_callback(count, total_keys)
+            
             # 超过最大键数时停止加载
             if count >= MAX_KEYS_STREAMING:
                 break
+        
+        # 最终进度更新
+        if progress_callback:
+            progress_callback(count, total_keys)
         
         return keys, total_keys
     

@@ -342,15 +342,24 @@ class LeftPanel:
         # 重置总键数估计
         self.total_keys_estimate = None
         
+        def progress_callback(current_count, total_count):
+            """进度回调函数"""
+            if total_count:
+                progress_text = f"Loading keys... {current_count}/{total_count} ({current_count/total_count*100:.1f}%)"
+            else:
+                progress_text = f"Loading keys... {current_count}"
+            
+            self.main_window.root.after(0, lambda: self.main_window.right_panel.update_status(progress_text))
+        
         def search_thread():
             try:
                 pattern = self.search_var.get() or "*"
                 max_keys = self.main_window.current_conn.get('max_keys', DEFAULT_MAX_KEYS)
                 
-                self.main_window.root.after(0, lambda: self.main_window.right_panel.update_status("Loading keys..."))
+                self.main_window.root.after(0, lambda: self.main_window.right_panel.update_status("Initializing key loading..."))
                 
                 redis_ops = RedisOperations(redis_client)
-                keys, total_keys = redis_ops.get_keys(pattern, max_keys)
+                keys, total_keys = redis_ops.get_keys(pattern, max_keys, progress_callback)
                 
                 self.current_keys = keys
                 self.total_keys_estimate = total_keys
@@ -374,11 +383,14 @@ class LeftPanel:
             self.keys_text.config(state='disabled')
             return
         
+        # 首先对键进行排序
+        sorted_keys = sorted(keys)
+        
         # 按分隔符分组 - 支持多级结构
         separator = self.separator_var.get()
         self.tree_structure = {}
         
-        for key in keys:
+        for key in sorted_keys:
             if separator in key:
                 parts = key.split(separator)
                 current_level = self.tree_structure
@@ -405,6 +417,9 @@ class LeftPanel:
                     self.tree_structure['_ungrouped'] = {'_children': {}, '_keys': []}
                 self.tree_structure['_ungrouped']['_keys'].append(key)
         
+        # 对树结构进行排序
+        self._sort_tree_structure(self.tree_structure)
+        
         # 渲染树结构
         self._render_tree_structure()
         
@@ -416,6 +431,18 @@ class LeftPanel:
             status_text += f" (total: {self.total_keys_estimate})"
         self.main_window.right_panel.update_status(status_text)
     
+    def _sort_tree_structure(self, structure):
+        """递归排序树结构"""
+        if isinstance(structure, dict):
+            # 排序键列表
+            if '_keys' in structure and structure['_keys']:
+                structure['_keys'].sort()
+            
+            # 递归排序子结构
+            if '_children' in structure and structure['_children']:
+                for child_name, child_structure in structure['_children'].items():
+                    self._sort_tree_structure(child_structure)
+    
     def _render_tree_structure(self):
         """渲染树结构显示"""
         self.keys_text.config(state='normal')
@@ -426,9 +453,11 @@ class LeftPanel:
         self.group_data = {}
         
         def add_tree_items(structure, level=0, path_prefix=""):
-            for name, data in structure.items():
-                if name.startswith('_'):
-                    continue
+            # 对分组名称进行排序
+            sorted_names = sorted([name for name in structure.keys() if not name.startswith('_')])
+            
+            for name in sorted_names:
+                data = structure[name]
                 
                 # 计算该分组的总键数
                 total_keys = count_keys_in_structure(data)
@@ -459,7 +488,8 @@ class LeftPanel:
                         add_tree_items(data['_children'], level + 1, group_path)
                     
                     if '_keys' in data and data['_keys']:
-                        for i, key in enumerate(sorted(data['_keys'])):
+                        # 键已经在_sort_tree_structure中排序过了
+                        for i, key in enumerate(data['_keys']):
                             key_indent = "    " * (level + 1) + "  "
                             is_last = i == len(data['_keys']) - 1 and not data.get('_children')
                             connector = "└─" if is_last else "├─"
