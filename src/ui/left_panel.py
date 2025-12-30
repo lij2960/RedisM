@@ -412,6 +412,8 @@ class LeftPanel:
         status_text = f"Found {len(keys)} keys"
         if self.total_keys_estimate and self.total_keys_estimate > len(keys):
             status_text += f" (showing {len(keys)} of ~{self.total_keys_estimate} total)"
+        elif self.total_keys_estimate and self.total_keys_estimate == len(keys):
+            status_text += f" (total: {self.total_keys_estimate})"
         self.main_window.right_panel.update_status(status_text)
     
     def _render_tree_structure(self):

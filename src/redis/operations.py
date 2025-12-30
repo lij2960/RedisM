@@ -34,11 +34,17 @@ class RedisOperations:
         
         # 获取当前数据库的总键数
         try:
-            info = self.redis_client.info('keyspace')
-            current_db = self.redis_client.connection_pool.connection_kwargs.get('db', 0)
-            db_key = f'db{current_db}'
-            total_keys = info.get(db_key, {}).get('keys', None) if db_key in info else None
-        except:
+            # 使用DBSIZE命令获取当前数据库的键总数，这比INFO keyspace更准确
+            total_keys = self.redis_client.dbsize()
+            
+            # 如果DBSIZE失败，尝试使用INFO keyspace作为备选方案
+            if total_keys is None:
+                info = self.redis_client.info('keyspace')
+                current_db = self.redis_client.connection_pool.connection_kwargs.get('db', 0)
+                db_key = f'db{current_db}'
+                total_keys = info.get(db_key, {}).get('keys', None) if db_key in info else None
+        except Exception as e:
+            print(f"Warning: Failed to get total keys count: {e}")
             total_keys = None
         
         for key in self.redis_client.scan_iter(match=pattern, count=1000):
