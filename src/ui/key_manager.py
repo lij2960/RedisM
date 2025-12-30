@@ -79,7 +79,7 @@ class KeyManager:
         threading.Thread(target=load_server_info, daemon=True).start()
     
     def _display_server_info(self, server_info):
-        """显示Redis服务器信息"""
+        """显示Redis服务器信息 - 网格布局铺满整屏"""
         # 清空当前内容
         for widget in self.key_details_frame.winfo_children():
             widget.destroy()
@@ -97,29 +97,45 @@ class KeyManager:
                      foreground='red').pack(pady=(5, 0))
             return
         
-        # 创建滚动框架
-        canvas = tk.Canvas(self.key_details_frame)
-        scrollbar = ttk.Scrollbar(self.key_details_frame, orient="vertical", command=canvas.yview)
-        scrollable_frame = ttk.Frame(canvas)
+        # 主容器 - 使用grid布局铺满整屏
+        main_container = ttk.Frame(self.key_details_frame)
+        main_container.pack(fill=tk.BOTH, expand=True, padx=5, pady=5)
         
-        scrollable_frame.bind(
-            "<Configure>",
-            lambda e: canvas.configure(scrollregion=canvas.bbox("all"))
-        )
+        # 配置网格权重，让内容填满整个区域
+        main_container.grid_columnconfigure(0, weight=1)
+        main_container.grid_columnconfigure(1, weight=1)
+        main_container.grid_rowconfigure(1, weight=1)
         
-        canvas.create_window((0, 0), window=scrollable_frame, anchor="nw")
-        canvas.configure(yscrollcommand=scrollbar.set)
-        
-        # 标题
-        title_frame = ttk.Frame(scrollable_frame)
-        title_frame.pack(fill=tk.X, padx=20, pady=(20, 10))
+        # 标题栏 - 跨两列
+        title_frame = ttk.Frame(main_container)
+        title_frame.grid(row=0, column=0, columnspan=2, sticky="ew", pady=(0, 5))
         
         ttk.Label(title_frame, text="🗄️ Redis Server Information", 
-                 font=self.main_window.style_manager.get_font(16, 'bold')).pack(anchor=tk.W)
+                 font=self.main_window.style_manager.get_font(16, 'bold')).pack(side=tk.LEFT)
         
+        # 刷新按钮放在标题右侧
+        ttk.Button(title_frame, text="🔄 Refresh", 
+                  command=self._refresh_server_info).pack(side=tk.RIGHT)
+        
+        # 左侧信息面板
+        left_panel = ttk.Frame(main_container)
+        left_panel.grid(row=1, column=0, sticky="nsew", padx=(0, 3))
+        
+        # 右侧信息面板
+        right_panel = ttk.Frame(main_container)
+        right_panel.grid(row=1, column=1, sticky="nsew", padx=(3, 0))
+        
+        # 左侧面板内容
+        self._create_left_info_panel(left_panel, server_info)
+        
+        # 右侧面板内容
+        self._create_right_info_panel(right_panel, server_info)
+    
+    def _create_left_info_panel(self, parent, server_info):
+        """创建左侧信息面板"""
         # 基本信息
-        basic_frame = ttk.LabelFrame(scrollable_frame, text="Basic Information", padding=10)
-        basic_frame.pack(fill=tk.X, padx=20, pady=(0, 10))
+        basic_frame = ttk.LabelFrame(parent, text="Basic Information", padding=5)
+        basic_frame.pack(fill=tk.X, pady=(0, 5))
         
         basic_info = [
             ("Redis Version", server_info.get('redis_version', 'Unknown')),
@@ -131,21 +147,17 @@ class KeyManager:
             ("Current Database", f"db{server_info.get('current_db', 0)}"),
         ]
         
-        for i, (label, value) in enumerate(basic_info):
-            row_frame = ttk.Frame(basic_frame)
-            row_frame.pack(fill=tk.X, pady=2)
-            ttk.Label(row_frame, text=f"{label}:", width=20, anchor='w').pack(side=tk.LEFT)
-            ttk.Label(row_frame, text=value, foreground='#0066CC').pack(side=tk.LEFT, padx=(10, 0))
+        self._create_info_grid(basic_frame, basic_info)
         
         # 运行时信息
-        runtime_frame = ttk.LabelFrame(scrollable_frame, text="Runtime Information", padding=10)
-        runtime_frame.pack(fill=tk.X, padx=20, pady=(0, 10))
+        runtime_frame = ttk.LabelFrame(parent, text="Runtime Information", padding=5)
+        runtime_frame.pack(fill=tk.X, pady=(0, 5))
         
         uptime_days = server_info.get('uptime_in_days', 0)
         uptime_seconds = server_info.get('uptime_in_seconds', 0)
         uptime_hours = (uptime_seconds % 86400) // 3600
         uptime_minutes = (uptime_seconds % 3600) // 60
-        uptime_text = f"{uptime_days} days, {uptime_hours} hours, {uptime_minutes} minutes"
+        uptime_text = f"{uptime_days}d {uptime_hours}h {uptime_minutes}m"
         
         runtime_info = [
             ("Uptime", uptime_text),
@@ -154,15 +166,11 @@ class KeyManager:
             ("Operations/sec", str(server_info.get('instantaneous_ops_per_sec', 0))),
         ]
         
-        for label, value in runtime_info:
-            row_frame = ttk.Frame(runtime_frame)
-            row_frame.pack(fill=tk.X, pady=2)
-            ttk.Label(row_frame, text=f"{label}:", width=20, anchor='w').pack(side=tk.LEFT)
-            ttk.Label(row_frame, text=value, foreground='#0066CC').pack(side=tk.LEFT, padx=(10, 0))
+        self._create_info_grid(runtime_frame, runtime_info)
         
         # 内存信息
-        memory_frame = ttk.LabelFrame(scrollable_frame, text="Memory Information", padding=10)
-        memory_frame.pack(fill=tk.X, padx=20, pady=(0, 10))
+        memory_frame = ttk.LabelFrame(parent, text="Memory Information", padding=5)
+        memory_frame.pack(fill=tk.BOTH, expand=True)
         
         memory_info = [
             ("Used Memory", server_info.get('used_memory_human', 'Unknown')),
@@ -171,15 +179,13 @@ class KeyManager:
             ("Max Memory", server_info.get('maxmemory_human', 'Not set') if server_info.get('maxmemory_human') else 'Not set'),
         ]
         
-        for label, value in memory_info:
-            row_frame = ttk.Frame(memory_frame)
-            row_frame.pack(fill=tk.X, pady=2)
-            ttk.Label(row_frame, text=f"{label}:", width=20, anchor='w').pack(side=tk.LEFT)
-            ttk.Label(row_frame, text=value, foreground='#0066CC').pack(side=tk.LEFT, padx=(10, 0))
-        
+        self._create_info_grid(memory_frame, memory_info)
+    
+    def _create_right_info_panel(self, parent, server_info):
+        """创建右侧信息面板"""
         # 统计信息
-        stats_frame = ttk.LabelFrame(scrollable_frame, text="Statistics", padding=10)
-        stats_frame.pack(fill=tk.X, padx=20, pady=(0, 10))
+        stats_frame = ttk.LabelFrame(parent, text="Statistics", padding=5)
+        stats_frame.pack(fill=tk.X, pady=(0, 5))
         
         stats_info = [
             ("Keyspace Hits", f"{server_info.get('keyspace_hits', 0):,}"),
@@ -189,41 +195,72 @@ class KeyManager:
             ("Evicted Keys", f"{server_info.get('evicted_keys', 0):,}"),
         ]
         
-        for label, value in stats_info:
-            row_frame = ttk.Frame(stats_frame)
-            row_frame.pack(fill=tk.X, pady=2)
-            ttk.Label(row_frame, text=f"{label}:", width=20, anchor='w').pack(side=tk.LEFT)
-            ttk.Label(row_frame, text=value, foreground='#0066CC').pack(side=tk.LEFT, padx=(10, 0))
+        self._create_info_grid(stats_frame, stats_info)
         
         # 数据库信息
         databases = server_info.get('databases', {})
         if databases:
-            db_frame = ttk.LabelFrame(scrollable_frame, text="Database Information", padding=10)
-            db_frame.pack(fill=tk.X, padx=20, pady=(0, 10))
+            db_frame = ttk.LabelFrame(parent, text="Database Information", padding=5)
+            db_frame.pack(fill=tk.BOTH, expand=True)
             
-            for db_num, db_info in databases.items():
-                db_row = ttk.Frame(db_frame)
-                db_row.pack(fill=tk.X, pady=2)
-                
+            # 创建数据库信息表格
+            db_tree_frame = ttk.Frame(db_frame)
+            db_tree_frame.pack(fill=tk.BOTH, expand=True)
+            
+            # 数据库信息表格
+            columns = ('Database', 'Keys', 'Expires')
+            db_tree = ttk.Treeview(db_tree_frame, columns=columns, show='headings', height=8)
+            
+            # 设置列标题和宽度
+            db_tree.heading('Database', text='Database')
+            db_tree.heading('Keys', text='Keys')
+            db_tree.heading('Expires', text='With TTL')
+            
+            db_tree.column('Database', width=80, minwidth=60)
+            db_tree.column('Keys', width=80, minwidth=60)
+            db_tree.column('Expires', width=80, minwidth=60)
+            
+            # 添加数据库信息
+            for db_num, db_info in sorted(databases.items(), key=lambda x: int(x[0])):
                 current_marker = " (current)" if int(db_num) == server_info.get('current_db', 0) else ""
-                ttk.Label(db_row, text=f"Database {db_num}{current_marker}:", width=20, anchor='w').pack(side=tk.LEFT)
+                db_name = f"db{db_num}{current_marker}"
+                keys_count = f"{db_info['keys']:,}"
+                expires_count = f"{db_info['expires']:,}" if db_info['expires'] > 0 else "0"
                 
-                db_details = f"{db_info['keys']:,} keys"
-                if db_info['expires'] > 0:
-                    db_details += f", {db_info['expires']:,} with TTL"
-                
-                ttk.Label(db_row, text=db_details, foreground='#0066CC').pack(side=tk.LEFT, padx=(10, 0))
-        
-        # 刷新按钮
-        refresh_frame = ttk.Frame(scrollable_frame)
-        refresh_frame.pack(fill=tk.X, padx=20, pady=(10, 20))
-        
-        ttk.Button(refresh_frame, text="🔄 Refresh Server Info", 
-                  command=self._refresh_server_info).pack()
-        
-        # 布局滚动组件
-        canvas.pack(side="left", fill="both", expand=True)
-        scrollbar.pack(side="right", fill="y")
+                # 高亮当前数据库
+                tags = ('current',) if int(db_num) == server_info.get('current_db', 0) else ()
+                db_tree.insert('', tk.END, values=(db_name, keys_count, expires_count), tags=tags)
+            
+            # 配置当前数据库的样式
+            db_tree.tag_configure('current', background='#E8F4FD')
+            
+            db_tree.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
+            
+            # 滚动条
+            db_scroll = ttk.Scrollbar(db_tree_frame, orient=tk.VERTICAL, command=db_tree.yview)
+            db_scroll.pack(side=tk.RIGHT, fill=tk.Y)
+            db_tree.configure(yscrollcommand=db_scroll.set)
+        else:
+            # 如果没有数据库信息，显示占位内容
+            placeholder_frame = ttk.LabelFrame(parent, text="Additional Information", padding=5)
+            placeholder_frame.pack(fill=tk.BOTH, expand=True)
+            
+            ttk.Label(placeholder_frame, text="No additional database information available", 
+                     foreground='#666666').pack(expand=True)
+    
+    def _create_info_grid(self, parent, info_list):
+        """创建信息网格布局"""
+        for i, (label, value) in enumerate(info_list):
+            row_frame = ttk.Frame(parent)
+            row_frame.pack(fill=tk.X, pady=1)
+            
+            # 标签
+            label_widget = ttk.Label(row_frame, text=f"{label}:", width=18, anchor='w')
+            label_widget.pack(side=tk.LEFT)
+            
+            # 值
+            value_widget = ttk.Label(row_frame, text=str(value), foreground='#0066CC', anchor='w')
+            value_widget.pack(side=tk.LEFT, padx=(5, 0), fill=tk.X, expand=True)
     
     def _refresh_server_info(self):
         """刷新服务器信息"""
