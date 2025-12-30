@@ -8,20 +8,20 @@ from tkinter import ttk
 
 
 class SearchMixin:
-    """搜索功能混入类，为文本组件添加Ctrl+F搜索功能"""
+    """搜索功能混入类，为文本组件添加⌘F搜索功能"""
     
     def add_search_to_text_widget(self, text_widget, parent_frame=None):
         """为文本组件添加搜索功能"""
-        # 绑定Ctrl+F快捷键
-        text_widget.bind('<Control-f>', lambda e: self._show_text_search_dialog(text_widget))
-        text_widget.bind('<Control-F>', lambda e: self._show_text_search_dialog(text_widget))
+        # 绑定⌘F快捷键
+        text_widget.bind('<Command-f>', lambda e: self._show_text_search_dialog(text_widget))
+        text_widget.bind('<Command-F>', lambda e: self._show_text_search_dialog(text_widget))
         
         # 如果提供了父框架，添加搜索按钮
         if parent_frame:
             search_btn_frame = ttk.Frame(parent_frame)
             search_btn_frame.pack(fill=tk.X, padx=5, pady=(0, 5))
             
-            ttk.Button(search_btn_frame, text="🔍 Search (Ctrl+F)", 
+            ttk.Button(search_btn_frame, text="🔍 Search (⌘F)", 
                       command=lambda: self._show_text_search_dialog(text_widget)).pack(side=tk.RIGHT)
     
     def _show_text_search_dialog(self, text_widget):

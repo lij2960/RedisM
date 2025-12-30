@@ -1,13 +1,13 @@
 # Search Functionality Implementation
 
 ## Overview
-Added comprehensive Ctrl+F search functionality to all text display windows in RedisM, including String value display and all dialog text areas.
+Added comprehensive ⌘F search functionality to all text display windows in RedisM, including String value display and all dialog text areas.
 
 ## Features Implemented
 
 ### 1. String Value Display Search (Key Manager)
 - **Location**: `src/ui/key_manager.py` - `_show_text_value` method
-- **Trigger**: Ctrl+F keyboard shortcut or "🔍 Search" button
+- **Trigger**: ⌘F keyboard shortcut or "🔍 Search" button
 - **Functionality**:
   - Real-time text search with case-insensitive matching
   - Find Next/Previous navigation
@@ -42,7 +42,7 @@ Added comprehensive Ctrl+F search functionality to all text display windows in R
 - **File**: `src/dialogs/search_mixin.py`
 - **Purpose**: Provides reusable search functionality for text widgets
 - **Methods**:
-  - `add_search_to_text_widget()`: Adds Ctrl+F binding and optional search button
+  - `add_search_to_text_widget()`: Adds ⌘F binding and optional search button
   - `_show_text_search_dialog()`: Creates and displays search dialog
   - `_find_in_text_widget()`: Performs actual text search with highlighting
 
@@ -71,13 +71,13 @@ Added comprehensive Ctrl+F search functionality to all text display windows in R
 
 ### For String Values (Key Manager)
 1. Select a String key in the key manager
-2. Press Ctrl+F or click the "🔍 Search" button
+2. Press ⌘F or click the "🔍 Search" button
 3. Enter search text in the dialog
 4. Use "Find Next"/"Find Previous" or Enter/Shift+Enter to navigate
 
 ### For Dialog Text Areas
 1. Open any dialog with text editing (Hash, List, Set, ZSet, etc.)
-2. Press Ctrl+F while focused on the text area
+2. Press ⌘F while focused on the text area
 3. Search dialog appears automatically
 4. Navigate through search results as above
 

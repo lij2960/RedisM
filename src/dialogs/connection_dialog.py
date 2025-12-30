@@ -24,8 +24,8 @@ class ConnectionDialog(BaseDialog):
         
         self._setup_ui()
         
-        if connection:
-            self._populate_fields()
+        # 总是调用_populate_fields来设置默认值或现有值
+        self._populate_fields()
     
     def _setup_ui(self):
         """设置UI"""
@@ -275,7 +275,8 @@ class ConnectionDialog(BaseDialog):
             self.fields['port'].insert(0, str(DEFAULT_REDIS_PORT))
             self.fields['max_keys'].insert(0, str(DEFAULT_MAX_KEYS))
             self.fields['db_count'].insert(0, str(DEFAULT_DB_COUNT))
-            self.fields['ssh_port'].insert(0, str(DEFAULT_SSH_PORT))
+            self.fields['ssh_port'].insert(0, '22')  # SSH端口默认22，不是21
+            self.fields['ssh_user'].insert(0, 'root')
             return
         
         # 编辑现有连接
@@ -295,7 +296,7 @@ class ConnectionDialog(BaseDialog):
         
         self.fields['ssh_host'].insert(0, conn.get('ssh_host', ''))
         self.fields['ssh_port'].insert(0, str(conn.get('ssh_port', DEFAULT_SSH_PORT)))
-        self.fields['ssh_user'].insert(0, conn.get('ssh_user', ''))
+        self.fields['ssh_user'].insert(0, conn.get('ssh_user', 'root'))
         self.fields['ssh_password'].insert(0, conn.get('ssh_password', ''))
         self.fields['ssh_key'].insert(0, conn.get('ssh_key', ''))
         self.fields['ssh_key_content'].insert(tk.END, conn.get('ssh_key_content', ''))

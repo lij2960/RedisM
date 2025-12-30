@@ -68,6 +68,68 @@ class RedisOperations:
         
         return keys, total_keys
     
+    def get_server_info(self, current_db=None):
+        """获取Redis服务器信息"""
+        try:
+            info = self.redis_client.info()
+            
+            # 提取关键信息
+            server_info = {
+                'redis_version': info.get('redis_version', 'Unknown'),
+                'redis_mode': info.get('redis_mode', 'standalone'),
+                'os': info.get('os', 'Unknown'),
+                'arch_bits': info.get('arch_bits', 'Unknown'),
+                'process_id': info.get('process_id', 'Unknown'),
+                'tcp_port': info.get('tcp_port', 'Unknown'),
+                'uptime_in_seconds': info.get('uptime_in_seconds', 0),
+                'uptime_in_days': info.get('uptime_in_days', 0),
+                'connected_clients': info.get('connected_clients', 0),
+                'used_memory_human': info.get('used_memory_human', 'Unknown'),
+                'used_memory_peak_human': info.get('used_memory_peak_human', 'Unknown'),
+                'total_system_memory_human': info.get('total_system_memory_human', 'Unknown'),
+                'maxmemory_human': info.get('maxmemory_human', 'Unknown'),
+                'total_commands_processed': info.get('total_commands_processed', 0),
+                'instantaneous_ops_per_sec': info.get('instantaneous_ops_per_sec', 0),
+                'keyspace_hits': info.get('keyspace_hits', 0),
+                'keyspace_misses': info.get('keyspace_misses', 0),
+                'expired_keys': info.get('expired_keys', 0),
+                'evicted_keys': info.get('evicted_keys', 0),
+            }
+            
+            # 计算命中率
+            hits = server_info['keyspace_hits']
+            misses = server_info['keyspace_misses']
+            if hits + misses > 0:
+                server_info['hit_rate'] = round((hits / (hits + misses)) * 100, 2)
+            else:
+                server_info['hit_rate'] = 0
+            
+            # 获取数据库信息
+            keyspace_info = info.get('keyspace', {})
+            databases = {}
+            for db_key, db_info in keyspace_info.items():
+                if db_key.startswith('db'):
+                    db_num = db_key[2:]  # 去掉'db'前缀
+                    databases[db_num] = {
+                        'keys': db_info.get('keys', 0),
+                        'expires': db_info.get('expires', 0),
+                        'avg_ttl': db_info.get('avg_ttl', 0)
+                    }
+            
+            server_info['databases'] = databases
+            
+            # 获取当前数据库编号
+            if current_db is not None:
+                server_info['current_db'] = current_db
+            else:
+                # 使用连接池的默认值作为后备
+                server_info['current_db'] = self.redis_client.connection_pool.connection_kwargs.get('db', 0)
+            
+            return server_info
+            
+        except Exception as e:
+            return {'error': str(e)}
+    
     def get_key_info(self, key):
         """获取键信息"""
         if not self.redis_client.exists(key):

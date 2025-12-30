@@ -293,6 +293,10 @@ class LeftPanel:
         
         self._update_db_list()
         self.search_keys()
+        
+        # 刷新key manager显示Redis服务器信息
+        self.main_window.right_panel.key_manager.clear_details()
+        self.main_window.right_panel.key_manager._show_welcome()
     
     def _on_connect_error(self, error):
         """连接错误回调"""
@@ -316,6 +320,10 @@ class LeftPanel:
             db_num = int(self.db_var.get().split()[1])
             redis_client.execute_command('SELECT', db_num)
             self.search_keys()
+            
+            # 刷新key manager显示以更新当前数据库信息
+            self.main_window.right_panel.key_manager.clear_details()
+            self.main_window.right_panel.key_manager._show_welcome()
     
     def refresh_connection_list(self):
         """刷新连接列表"""

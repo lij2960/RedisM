@@ -32,14 +32,203 @@ class KeyManager:
         self._show_welcome()
     
     def _show_welcome(self):
-        """显示欢迎界面"""
-        welcome_frame = ttk.Frame(self.key_details_frame)
-        welcome_frame.pack(expand=True)
+        """显示Redis服务器信息"""
+        # 检查是否有Redis连接
+        redis_client = self.main_window.get_redis_client()
+        if not redis_client:
+            # 没有连接时显示欢迎界面
+            welcome_frame = ttk.Frame(self.key_details_frame)
+            welcome_frame.pack(expand=True)
+            
+            ttk.Label(welcome_frame, text="🔑", 
+                     font=self.main_window.style_manager.get_font(48)).pack(pady=(0, 10))
+            ttk.Label(welcome_frame, text="Connect to Redis to view server information", 
+                     style='Title.TLabel').pack()
+            return
         
-        ttk.Label(welcome_frame, text="🔑", 
-                 font=self.main_window.style_manager.get_font(48)).pack(pady=(0, 10))
-        ttk.Label(welcome_frame, text="Select a key to view details", 
+        # 有连接时显示Redis服务器信息
+        def load_server_info():
+            try:
+                redis_ops = RedisOperations(redis_client)
+                
+                # 获取当前数据库编号
+                current_db = 0  # 默认值
+                try:
+                    # 从左侧面板的数据库选择器获取当前数据库
+                    if hasattr(self.main_window, 'left_panel') and hasattr(self.main_window.left_panel, 'db_var'):
+                        db_text = self.main_window.left_panel.db_var.get()
+                        if db_text and db_text.startswith('DB '):
+                            current_db = int(db_text.split()[1])
+                except:
+                    current_db = 0
+                
+                server_info = redis_ops.get_server_info(current_db)
+                self.main_window.root.after(0, lambda: self._display_server_info(server_info))
+            except Exception as e:
+                error_info = {'error': str(e)}
+                self.main_window.root.after(0, lambda: self._display_server_info(error_info))
+        
+        # 显示加载中
+        loading_frame = ttk.Frame(self.key_details_frame)
+        loading_frame.pack(expand=True)
+        ttk.Label(loading_frame, text="Loading Redis server information...", 
                  style='Title.TLabel').pack()
+        
+        # 在后台线程中加载服务器信息
+        import threading
+        threading.Thread(target=load_server_info, daemon=True).start()
+    
+    def _display_server_info(self, server_info):
+        """显示Redis服务器信息"""
+        # 清空当前内容
+        for widget in self.key_details_frame.winfo_children():
+            widget.destroy()
+        
+        if 'error' in server_info:
+            # 显示错误信息
+            error_frame = ttk.Frame(self.key_details_frame)
+            error_frame.pack(expand=True)
+            
+            ttk.Label(error_frame, text="❌", 
+                     font=self.main_window.style_manager.get_font(48)).pack(pady=(0, 10))
+            ttk.Label(error_frame, text="Failed to load Redis server information", 
+                     style='Title.TLabel').pack()
+            ttk.Label(error_frame, text=f"Error: {server_info['error']}", 
+                     foreground='red').pack(pady=(5, 0))
+            return
+        
+        # 创建滚动框架
+        canvas = tk.Canvas(self.key_details_frame)
+        scrollbar = ttk.Scrollbar(self.key_details_frame, orient="vertical", command=canvas.yview)
+        scrollable_frame = ttk.Frame(canvas)
+        
+        scrollable_frame.bind(
+            "<Configure>",
+            lambda e: canvas.configure(scrollregion=canvas.bbox("all"))
+        )
+        
+        canvas.create_window((0, 0), window=scrollable_frame, anchor="nw")
+        canvas.configure(yscrollcommand=scrollbar.set)
+        
+        # 标题
+        title_frame = ttk.Frame(scrollable_frame)
+        title_frame.pack(fill=tk.X, padx=20, pady=(20, 10))
+        
+        ttk.Label(title_frame, text="🗄️ Redis Server Information", 
+                 font=self.main_window.style_manager.get_font(16, 'bold')).pack(anchor=tk.W)
+        
+        # 基本信息
+        basic_frame = ttk.LabelFrame(scrollable_frame, text="Basic Information", padding=10)
+        basic_frame.pack(fill=tk.X, padx=20, pady=(0, 10))
+        
+        basic_info = [
+            ("Redis Version", server_info.get('redis_version', 'Unknown')),
+            ("Mode", server_info.get('redis_mode', 'standalone')),
+            ("Operating System", server_info.get('os', 'Unknown')),
+            ("Architecture", f"{server_info.get('arch_bits', 'Unknown')} bit"),
+            ("Process ID", str(server_info.get('process_id', 'Unknown'))),
+            ("TCP Port", str(server_info.get('tcp_port', 'Unknown'))),
+            ("Current Database", f"db{server_info.get('current_db', 0)}"),
+        ]
+        
+        for i, (label, value) in enumerate(basic_info):
+            row_frame = ttk.Frame(basic_frame)
+            row_frame.pack(fill=tk.X, pady=2)
+            ttk.Label(row_frame, text=f"{label}:", width=20, anchor='w').pack(side=tk.LEFT)
+            ttk.Label(row_frame, text=value, foreground='#0066CC').pack(side=tk.LEFT, padx=(10, 0))
+        
+        # 运行时信息
+        runtime_frame = ttk.LabelFrame(scrollable_frame, text="Runtime Information", padding=10)
+        runtime_frame.pack(fill=tk.X, padx=20, pady=(0, 10))
+        
+        uptime_days = server_info.get('uptime_in_days', 0)
+        uptime_seconds = server_info.get('uptime_in_seconds', 0)
+        uptime_hours = (uptime_seconds % 86400) // 3600
+        uptime_minutes = (uptime_seconds % 3600) // 60
+        uptime_text = f"{uptime_days} days, {uptime_hours} hours, {uptime_minutes} minutes"
+        
+        runtime_info = [
+            ("Uptime", uptime_text),
+            ("Connected Clients", str(server_info.get('connected_clients', 0))),
+            ("Commands Processed", f"{server_info.get('total_commands_processed', 0):,}"),
+            ("Operations/sec", str(server_info.get('instantaneous_ops_per_sec', 0))),
+        ]
+        
+        for label, value in runtime_info:
+            row_frame = ttk.Frame(runtime_frame)
+            row_frame.pack(fill=tk.X, pady=2)
+            ttk.Label(row_frame, text=f"{label}:", width=20, anchor='w').pack(side=tk.LEFT)
+            ttk.Label(row_frame, text=value, foreground='#0066CC').pack(side=tk.LEFT, padx=(10, 0))
+        
+        # 内存信息
+        memory_frame = ttk.LabelFrame(scrollable_frame, text="Memory Information", padding=10)
+        memory_frame.pack(fill=tk.X, padx=20, pady=(0, 10))
+        
+        memory_info = [
+            ("Used Memory", server_info.get('used_memory_human', 'Unknown')),
+            ("Peak Memory", server_info.get('used_memory_peak_human', 'Unknown')),
+            ("System Memory", server_info.get('total_system_memory_human', 'Unknown')),
+            ("Max Memory", server_info.get('maxmemory_human', 'Not set') if server_info.get('maxmemory_human') else 'Not set'),
+        ]
+        
+        for label, value in memory_info:
+            row_frame = ttk.Frame(memory_frame)
+            row_frame.pack(fill=tk.X, pady=2)
+            ttk.Label(row_frame, text=f"{label}:", width=20, anchor='w').pack(side=tk.LEFT)
+            ttk.Label(row_frame, text=value, foreground='#0066CC').pack(side=tk.LEFT, padx=(10, 0))
+        
+        # 统计信息
+        stats_frame = ttk.LabelFrame(scrollable_frame, text="Statistics", padding=10)
+        stats_frame.pack(fill=tk.X, padx=20, pady=(0, 10))
+        
+        stats_info = [
+            ("Keyspace Hits", f"{server_info.get('keyspace_hits', 0):,}"),
+            ("Keyspace Misses", f"{server_info.get('keyspace_misses', 0):,}"),
+            ("Hit Rate", f"{server_info.get('hit_rate', 0)}%"),
+            ("Expired Keys", f"{server_info.get('expired_keys', 0):,}"),
+            ("Evicted Keys", f"{server_info.get('evicted_keys', 0):,}"),
+        ]
+        
+        for label, value in stats_info:
+            row_frame = ttk.Frame(stats_frame)
+            row_frame.pack(fill=tk.X, pady=2)
+            ttk.Label(row_frame, text=f"{label}:", width=20, anchor='w').pack(side=tk.LEFT)
+            ttk.Label(row_frame, text=value, foreground='#0066CC').pack(side=tk.LEFT, padx=(10, 0))
+        
+        # 数据库信息
+        databases = server_info.get('databases', {})
+        if databases:
+            db_frame = ttk.LabelFrame(scrollable_frame, text="Database Information", padding=10)
+            db_frame.pack(fill=tk.X, padx=20, pady=(0, 10))
+            
+            for db_num, db_info in databases.items():
+                db_row = ttk.Frame(db_frame)
+                db_row.pack(fill=tk.X, pady=2)
+                
+                current_marker = " (current)" if int(db_num) == server_info.get('current_db', 0) else ""
+                ttk.Label(db_row, text=f"Database {db_num}{current_marker}:", width=20, anchor='w').pack(side=tk.LEFT)
+                
+                db_details = f"{db_info['keys']:,} keys"
+                if db_info['expires'] > 0:
+                    db_details += f", {db_info['expires']:,} with TTL"
+                
+                ttk.Label(db_row, text=db_details, foreground='#0066CC').pack(side=tk.LEFT, padx=(10, 0))
+        
+        # 刷新按钮
+        refresh_frame = ttk.Frame(scrollable_frame)
+        refresh_frame.pack(fill=tk.X, padx=20, pady=(10, 20))
+        
+        ttk.Button(refresh_frame, text="🔄 Refresh Server Info", 
+                  command=self._refresh_server_info).pack()
+        
+        # 布局滚动组件
+        canvas.pack(side="left", fill="both", expand=True)
+        scrollbar.pack(side="right", fill="y")
+    
+    def _refresh_server_info(self):
+        """刷新服务器信息"""
+        self.clear_details()
+        self._show_welcome()
     
     def clear_details(self):
         """清空详情"""
@@ -273,7 +462,7 @@ class KeyManager:
                   command=lambda: self._minify_json_value()).pack(side=tk.LEFT)
         
         # 搜索按钮
-        ttk.Button(format_frame, text="🔍 Search (Ctrl+F)", 
+        ttk.Button(format_frame, text="🔍 Search (⌘F)", 
                   command=lambda: self._show_search_dialog()).pack(side=tk.RIGHT)
         
         # 文本编辑器
@@ -288,9 +477,9 @@ class KeyManager:
         value_scroll.pack(side=tk.RIGHT, fill=tk.Y)
         self.value_text.configure(yscrollcommand=value_scroll.set)
         
-        # 绑定Ctrl+F快捷键
-        self.value_text.bind('<Control-f>', lambda e: self._show_search_dialog())
-        self.value_text.bind('<Control-F>', lambda e: self._show_search_dialog())
+        # 绑定⌘F快捷键
+        self.value_text.bind('<Command-f>', lambda e: self._show_search_dialog())
+        self.value_text.bind('<Command-F>', lambda e: self._show_search_dialog())
         
         # 确保文本框能接收焦点和键盘事件
         self.value_text.focus_set()

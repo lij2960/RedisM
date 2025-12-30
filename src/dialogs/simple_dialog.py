@@ -125,12 +125,12 @@ class SimpleDialog(SearchMixin):
         search_frame = ttk.Frame(parent)
         search_frame.grid(row=1, column=0, sticky="ew")
         
-        ttk.Button(search_frame, text="🔍 Search (Ctrl+F)", 
+        ttk.Button(search_frame, text="🔍 Search (⌘F)", 
                   command=lambda: self._show_text_search_dialog(text_widget)).pack(side=tk.RIGHT)
         
-        # 绑定Ctrl+F快捷键
-        text_widget.bind('<Control-f>', lambda e: self._show_text_search_dialog(text_widget))
-        text_widget.bind('<Control-F>', lambda e: self._show_text_search_dialog(text_widget))
+        # 绑定⌘F快捷键
+        text_widget.bind('<Command-f>', lambda e: self._show_text_search_dialog(text_widget))
+        text_widget.bind('<Command-F>', lambda e: self._show_text_search_dialog(text_widget))
         
         return text_widget, text_frame
     

@@ -17,7 +17,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - SetEditDialog: ✅ Migrated with full auto-resize  
   - ListEditDialog: ✅ Migrated with full auto-resize
   - ZSetEditDialog: ✅ Migrated with full auto-resize
-- **Enhanced Search Integration**: Preserved Ctrl+F search functionality in all migrated dialogs
+- **Enhanced Search Integration**: Preserved ⌘F search functionality in all migrated dialogs
 - **Improved Default Sizes**: Adjusted dialog default window sizes for better user experience
   - SetEditDialog: 600x400 → 800x500
   - ListEditDialog: 600x400 → 800x500
@@ -57,9 +57,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [1.0.2] - 2024-12-29
 
 ### 🆕 Added
-- **Ctrl+F Search Functionality**: Implemented comprehensive search functionality for all text display windows
-  - String value display window now supports Ctrl+F search with real-time highlighting
-  - All dialog text areas (Hash, List, Set, ZSet editing and creation) support Ctrl+F search
+- **⌘F Search Functionality**: Implemented comprehensive search functionality for all text display windows
+  - String value display window now supports ⌘F search with real-time highlighting
+  - All dialog text areas (Hash, List, Set, ZSet editing and creation) support ⌘F search
   - Search dialog with Find Next/Previous navigation and status display
   - Case-insensitive search with automatic wrapping
   - Yellow highlighting of search results with auto-scroll to matches
