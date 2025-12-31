@@ -106,13 +106,17 @@ class RedisConnection:
             self.redis_client.ping()
             return True
             
-        except Exception:
+        except Exception as ping_error:
+            print(f"Connection lost: {ping_error}")
             # 连接断开，尝试重连
             if self.current_conn:
                 try:
+                    print("Attempting to reconnect...")
                     self.connect(self.current_conn)
+                    print("Reconnection successful")
                     return True
-                except Exception:
+                except Exception as reconnect_error:
+                    print(f"Reconnection failed: {reconnect_error}")
                     return False
             return False
     

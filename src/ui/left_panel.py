@@ -392,6 +392,26 @@ class LeftPanel:
                 
             except Exception as e:
                 error_msg = str(e)
+                # 检查是否是连接相关的错误
+                if "connection" in error_msg.lower() or "timeout" in error_msg.lower():
+                    try:
+                        # 尝试重连主连接
+                        if self.main_window.redis_conn.check_and_reconnect():
+                            self.main_window.root.after(0, lambda: self.main_window.right_panel.update_status("Reconnected, retrying key search..."))
+                            # 重试获取数据库客户端
+                            db_client = self.main_window.redis_conn.get_database_client(db_num)
+                            if db_client:
+                                redis_ops = RedisOperations(db_client)
+                                keys, total_keys = redis_ops.get_keys(pattern, max_keys, progress_callback)
+                                self.current_keys = keys
+                                self.total_keys_estimate = total_keys
+                                self.main_window.root.after(0, lambda: self._update_keys_tree(keys))
+                                self.main_window.root.after(0, lambda: self.main_window.right_panel.update_status("Keys loaded after reconnection"))
+                                db_client.close()
+                                return
+                    except Exception as retry_e:
+                        error_msg = f"Failed to search keys after reconnection: {str(retry_e)}"
+                
                 self.main_window.root.after(0, lambda msg=error_msg: 
                     self.main_window.right_panel.update_status(f"Failed to get keys: {msg}"))
         
@@ -413,10 +433,12 @@ class LeftPanel:
         """搜索键"""
         redis_client = self.main_window.get_redis_client()
         if not redis_client:
+            self.main_window.right_panel.update_status("No Redis connection available")
             return
         
         # 检查连接状态，如果断开则尝试重连
         if not self.main_window.redis_conn.check_and_reconnect():
+            self.main_window.right_panel.update_status("Redis connection lost and failed to reconnect")
             return
         
         def progress_callback(current_count, total_count):
@@ -444,6 +466,23 @@ class LeftPanel:
                 
             except Exception as e:
                 error_msg = str(e)
+                # 检查是否是连接相关的错误
+                if "connection" in error_msg.lower() or "timeout" in error_msg.lower():
+                    try:
+                        # 尝试重连
+                        if self.main_window.redis_conn.check_and_reconnect():
+                            self.main_window.root.after(0, lambda: self.main_window.right_panel.update_status("Reconnected, retrying key search..."))
+                            # 重试搜索
+                            redis_ops = RedisOperations(self.main_window.get_redis_client())
+                            keys, total_keys = redis_ops.get_keys(pattern, max_keys, progress_callback, target_db)
+                            self.current_keys = keys
+                            self.total_keys_estimate = total_keys
+                            self.main_window.root.after(0, lambda: self._update_keys_tree(keys))
+                            self.main_window.root.after(0, lambda: self.main_window.right_panel.update_status("Keys loaded after reconnection"))
+                            return
+                    except Exception as retry_e:
+                        error_msg = f"Failed to search keys after reconnection: {str(retry_e)}"
+                
                 self.main_window.root.after(0, lambda msg=error_msg: 
                     self.main_window.right_panel.update_status(f"Failed to get keys: {msg}"))
         
