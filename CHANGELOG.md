@@ -5,6 +5,85 @@ All notable changes to RedisM will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.0.4] - 2024-12-31
+
+### 🔄 Added
+- **Intelligent Auto-Reconnection**: Implemented comprehensive auto-reconnection functionality
+  - Automatic connection detection and recovery when Redis connection is lost
+  - Seamless operation continuation after successful reconnection
+  - Real-time status feedback during reconnection process
+  - Enhanced error handling to distinguish connection errors from other issues
+- **Auto-Reconnect for All Operations**: Extended auto-reconnect to all Redis operations
+  - Key loading and viewing with automatic reconnection
+  - Key updating and deletion with reconnection support
+  - Database switching with connection recovery
+  - Search operations with reconnection capability
+
+### 🗄️ Fixed
+- **Database Switching Key List Update**: Resolved issue where key tree structure showed old data after database switching
+  - **Root Cause**: Redis connection pool inconsistency when switching databases
+  - **Solution**: Implemented dedicated database client creation for each database switch
+  - **Enhancement**: Added connection pool management to ensure database state consistency
+- **Connection Pool Management**: Improved Redis connection pool handling
+  - Added `get_database_client()` method for database-specific operations
+  - Enhanced `select_database()` method with connection pool reset
+  - Proper connection state management across database switches
+
+### 🎨 Enhanced
+- **Dual-Panel Server Information Layout**: Completely redesigned Redis server information display
+  - **Left Panel**: Basic Information, Runtime Information, Memory Information
+  - **Right Panel**: Statistics, Database Information (table format)
+  - **Space Optimization**: Removed excessive padding, maximized screen space utilization
+  - **Grid Layout**: Replaced vertical scrolling with efficient dual-column grid layout
+- **Database Information Table**: Enhanced database information display
+  - Table format showing Database, Keys count, and TTL keys count
+  - Current database highlighted with background color
+  - Scrollable table for servers with many databases
+  - Real-time updates when switching databases
+
+### 🔧 Improved
+- **Connection Status Management**: Enhanced connection state tracking and user feedback
+  - Clear status messages during reconnection attempts
+  - Differentiated error messages for connection vs. operation failures
+  - Progress indicators for long-running reconnection operations
+- **Error Recovery**: Robust error handling with automatic retry mechanisms
+  - Connection error detection and automatic retry
+  - Operation continuation after successful reconnection
+  - User-friendly error messages with actionable information
+- **User Experience**: Seamless operation flow with minimal interruption
+  - Transparent reconnection process
+  - Automatic operation retry after reconnection
+  - Clear status feedback throughout the process
+
+### 🧹 Cleaned
+- **Project Structure**: Comprehensive cleanup of development artifacts
+  - Removed temporary documentation files (DIALOG_AUTO_RESIZE.md, SEARCH_FUNCTIONALITY.md)
+  - Deleted test files and development scripts (test.py)
+  - Streamlined docs directory to essential files only
+  - Cleaned up build artifacts and temporary files
+- **Code Organization**: Improved code maintainability and structure
+  - Consolidated connection management logic
+  - Enhanced error handling patterns
+  - Simplified database switching workflow
+
+### 📚 Documentation
+- **Updated README**: Comprehensive update to v1.0.4 with new features
+  - Added auto-reconnection feature documentation
+  - Enhanced troubleshooting section with reconnection guidance
+  - Updated feature descriptions with latest capabilities
+  - Improved installation and usage instructions
+- **Version History**: Updated changelog with detailed v1.0.4 improvements
+
+### 🏗️ Architecture
+- **Connection Management**: Enhanced Redis connection architecture
+  - Improved connection pool handling for database operations
+  - Added dedicated database client creation methods
+  - Enhanced connection state validation and recovery
+- **Error Handling**: Systematic error handling and recovery patterns
+  - Connection error detection and classification
+  - Automatic retry mechanisms with user feedback
+  - Graceful degradation and recovery strategies
+
 ## [1.0.3] - 2024-12-30
 
 ### ✨ Added
