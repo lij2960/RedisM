@@ -152,7 +152,15 @@ class LeftPanel:
         search_entry.pack(side=tk.LEFT, fill=tk.X, expand=True)
         search_entry.bind('<Return>', lambda e: self.search_keys())
         
-        ttk.Button(search_input_frame, text="🔍", command=self.search_keys, width=4).pack(side=tk.RIGHT, padx=(5, 0))
+        # 搜索按钮 - 添加工具提示说明会获取实时数据
+        self.search_btn = ttk.Button(search_input_frame, text="🔍", command=self._on_search_click, width=4)
+        self.search_btn.pack(side=tk.RIGHT, padx=(5, 0))
+        
+        # 添加实时搜索提示
+        search_hint_frame = ttk.Frame(search_frame)
+        search_hint_frame.pack(fill=tk.X, pady=(0, 5))
+        ttk.Label(search_hint_frame, text="💡 搜索会实时获取Redis最新数据", 
+                 font=('Arial', 8), foreground='#666666').pack(anchor=tk.W)
         
         # 键树形列表
         self._setup_keys_tree(search_frame)
@@ -374,7 +382,7 @@ class LeftPanel:
             self.main_window.right_panel.update_status(f"Failed to switch database: {e}")
     
     def search_keys_with_db_client(self, db_num):
-        """使用专门的数据库客户端搜索键"""
+        """使用专门的数据库客户端搜索键 - 实时获取最新数据"""
         def progress_callback(current_count, total_count):
             """进度回调函数"""
             if total_count:
@@ -386,6 +394,10 @@ class LeftPanel:
         
         def search_thread():
             try:
+                # 清除之前的键数据缓存，确保获取最新数据
+                self.current_keys = []
+                self.total_keys_estimate = None
+                
                 # 获取专门的数据库客户端
                 db_client = self.main_window.redis_conn.get_database_client(db_num)
                 if not db_client:
@@ -394,7 +406,7 @@ class LeftPanel:
                 pattern = self.search_var.get() or "*"
                 max_keys = self.main_window.current_conn.get('max_keys', DEFAULT_MAX_KEYS)
                 
-                self.main_window.root.after(0, lambda: self.main_window.right_panel.update_status("Initializing key loading..."))
+                self.main_window.root.after(0, lambda: self.main_window.right_panel.update_status(f"🔍 Scanning database {db_num} for keys..."))
                 
                 redis_ops = RedisOperations(db_client)
                 keys, total_keys = redis_ops.get_keys(pattern, max_keys, progress_callback)
@@ -402,6 +414,13 @@ class LeftPanel:
                 self.current_keys = keys
                 self.total_keys_estimate = total_keys
                 self.main_window.root.after(0, lambda: self._update_keys_tree(keys))
+                
+                # 更新状态显示找到的键数量
+                key_count = len(keys) if keys else 0
+                status_msg = f"✅ Found {key_count} keys in database {db_num}"
+                if total_keys and total_keys != key_count:
+                    status_msg += f" (total: {total_keys})"
+                self.main_window.root.after(0, lambda: self.main_window.right_panel.update_status(status_msg))
                 
                 # 关闭临时客户端
                 db_client.close()
@@ -413,7 +432,7 @@ class LeftPanel:
                     try:
                         # 尝试重连主连接
                         if self.main_window.redis_conn.check_and_reconnect():
-                            self.main_window.root.after(0, lambda: self.main_window.right_panel.update_status("Reconnected, retrying key search..."))
+                            self.main_window.root.after(0, lambda: self.main_window.right_panel.update_status("🔄 Reconnected, retrying key search..."))
                             # 重试获取数据库客户端
                             db_client = self.main_window.redis_conn.get_database_client(db_num)
                             if db_client:
@@ -422,7 +441,9 @@ class LeftPanel:
                                 self.current_keys = keys
                                 self.total_keys_estimate = total_keys
                                 self.main_window.root.after(0, lambda: self._update_keys_tree(keys))
-                                self.main_window.root.after(0, lambda: self.main_window.right_panel.update_status("Keys loaded after reconnection"))
+                                
+                                key_count = len(keys) if keys else 0
+                                self.main_window.root.after(0, lambda: self.main_window.right_panel.update_status(f"✅ Keys loaded after reconnection ({key_count} found in DB {db_num})"))
                                 db_client.close()
                                 return
                     except Exception as retry_e:
@@ -444,9 +465,28 @@ class LeftPanel:
                 display_name = conn['name']
             self.conn_listbox.insert(tk.END, display_name)
     
+    def _on_search_click(self):
+        """搜索按钮点击处理 - 提供视觉反馈"""
+        # 临时改变按钮文本，显示正在搜索
+        original_text = self.search_btn.cget('text')
+        self.search_btn.config(text="🔄", state="disabled")
+        
+        def restore_button():
+            """恢复按钮状态"""
+            try:
+                self.search_btn.config(text=original_text, state="normal")
+            except:
+                pass  # 如果窗口已关闭，忽略错误
+        
+        # 启动搜索
+        self.search_keys()
+        
+        # 1秒后恢复按钮状态
+        self.main_window.root.after(1000, restore_button)
+    
     # 键搜索和显示方法
     def search_keys(self, target_db=None):
-        """搜索键"""
+        """搜索键 - 实时从Redis获取最新数据"""
         redis_client = self.main_window.get_redis_client()
         if not redis_client:
             self.main_window.right_panel.update_status("No Redis connection available")
@@ -456,6 +496,9 @@ class LeftPanel:
         if not self.main_window.redis_conn.check_and_reconnect():
             self.main_window.right_panel.update_status("Redis connection lost and failed to reconnect")
             return
+        
+        # 立即更新状态，告知用户正在获取最新数据
+        self.main_window.right_panel.update_status("🔄 Fetching latest data from Redis...")
         
         def progress_callback(current_count, total_count):
             """进度回调函数"""
@@ -468,17 +511,34 @@ class LeftPanel:
         
         def search_thread():
             try:
+                # 清除之前的键数据缓存，确保获取最新数据
+                self.current_keys = []
+                self.total_keys_estimate = None
+                
                 pattern = self.search_var.get() or "*"
                 max_keys = self.main_window.current_conn.get('max_keys', DEFAULT_MAX_KEYS)
                 
-                self.main_window.root.after(0, lambda: self.main_window.right_panel.update_status("Initializing key loading..."))
+                self.main_window.root.after(0, lambda: self.main_window.right_panel.update_status("🔍 Scanning Redis database for keys..."))
                 
-                redis_ops = RedisOperations(redis_client)
+                # 获取最新的Redis客户端连接，确保数据是实时的
+                fresh_redis_client = self.main_window.get_redis_client()
+                if not fresh_redis_client:
+                    self.main_window.root.after(0, lambda: self.main_window.right_panel.update_status("❌ Redis connection not available"))
+                    return
+                
+                redis_ops = RedisOperations(fresh_redis_client)
                 keys, total_keys = redis_ops.get_keys(pattern, max_keys, progress_callback, target_db)
                 
                 self.current_keys = keys
                 self.total_keys_estimate = total_keys
                 self.main_window.root.after(0, lambda: self._update_keys_tree(keys))
+                
+                # 更新状态显示找到的键数量
+                key_count = len(keys) if keys else 0
+                status_msg = f"✅ Found {key_count} keys"
+                if total_keys and total_keys != key_count:
+                    status_msg += f" (total in database: {total_keys})"
+                self.main_window.root.after(0, lambda: self.main_window.right_panel.update_status(status_msg))
                 
             except Exception as e:
                 error_msg = str(e)
@@ -487,20 +547,23 @@ class LeftPanel:
                     try:
                         # 尝试重连
                         if self.main_window.redis_conn.check_and_reconnect():
-                            self.main_window.root.after(0, lambda: self.main_window.right_panel.update_status("Reconnected, retrying key search..."))
-                            # 重试搜索
-                            redis_ops = RedisOperations(self.main_window.get_redis_client())
+                            self.main_window.root.after(0, lambda: self.main_window.right_panel.update_status("🔄 Reconnected, retrying key search..."))
+                            # 重试搜索 - 使用最新的连接
+                            fresh_redis_client = self.main_window.get_redis_client()
+                            redis_ops = RedisOperations(fresh_redis_client)
                             keys, total_keys = redis_ops.get_keys(pattern, max_keys, progress_callback, target_db)
                             self.current_keys = keys
                             self.total_keys_estimate = total_keys
                             self.main_window.root.after(0, lambda: self._update_keys_tree(keys))
-                            self.main_window.root.after(0, lambda: self.main_window.right_panel.update_status("Keys loaded after reconnection"))
+                            
+                            key_count = len(keys) if keys else 0
+                            self.main_window.root.after(0, lambda: self.main_window.right_panel.update_status(f"✅ Keys loaded after reconnection ({key_count} found)"))
                             return
                     except Exception as retry_e:
                         error_msg = f"Failed to search keys after reconnection: {str(retry_e)}"
                 
                 self.main_window.root.after(0, lambda msg=error_msg: 
-                    self.main_window.right_panel.update_status(f"Failed to get keys: {msg}"))
+                    self.main_window.right_panel.update_status(f"❌ Failed to get keys: {msg}"))
         
         threading.Thread(target=search_thread, daemon=True).start()
     
@@ -685,9 +748,10 @@ class LeftPanel:
         self.current_keys = []
     
     def _on_separator_change(self, event):
-        """分隔符改变事件"""
-        if self.main_window.get_redis_client() and hasattr(self, 'current_keys'):
-            self._update_keys_tree(self.current_keys)
+        """分隔符改变事件 - 重新搜索以获取最新数据"""
+        if self.main_window.get_redis_client():
+            # 重新搜索以获取最新数据，而不是使用缓存的数据
+            self.search_keys()
     
     def _add_new_key(self):
         """添加新键"""
