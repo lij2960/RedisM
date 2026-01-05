@@ -5,6 +5,42 @@ All notable changes to RedisM will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.0.5] - 2025-01-05
+
+### 🔧 Fixed
+- **UI Layout Improvements**: Fixed critical layout issues for better user experience
+  - Fixed Add New Key dialog data type section getting compressed in small windows
+  - Fixed Key Manager value area JSON format buttons and search controls getting hidden
+  - Applied consistent fixed-height approach to prevent UI element compression
+  - Improved grid layout weight configuration for proper auto-resizing
+
+- **Hash Edit Dialog**: Fixed critical error in hash field editing
+  - Resolved "HashEditDialog object has no attribute 'old_value'" error
+  - Corrected hash operations (was incorrectly using set operations)
+  - Added proper field name validation and change handling
+  - Fixed success messages and error handling for hash operations
+
+- **Tab Navigation**: Completely disabled mouse wheel tab switching
+  - Removed unwanted scrollwheel switching between Key Manager and Command Line tabs
+  - Preserved normal scrolling functionality for content areas
+  - Enhanced user experience by preventing accidental tab changes
+
+- **Key Manager Scrolling**: Removed unnecessary scrollbars from Key Manager window
+  - Simplified layout by removing Canvas-based scrolling framework
+  - Improved performance and visual clarity
+  - Maintained proper auto-resizing behavior for content areas
+
+### 🎨 Enhanced
+- **Data Type Selection**: Improved Add New Key dialog layout
+  - Changed data type radio buttons from two rows to single row for better space utilization
+  - Increased minimum window size to ensure all controls remain visible
+  - Enhanced visual spacing and button arrangement
+
+- **Structured Data Display**: Enhanced filter and operation controls
+  - Applied fixed-height approach to filter input areas for hash, list, set, zset types
+  - Ensured operation buttons (Add Item, Delete Item, Update All, Refresh) always remain accessible
+  - Improved table display auto-resizing while preserving control visibility
+
 ## [1.0.4] - 2024-12-31
 
 ### 🔄 Added

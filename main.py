@@ -16,7 +16,7 @@ RedisM - 现代化的Redis管理工具
     python main.py
 
 作者: RedisM Team
-版本: 1.0.1
+版本: 1.0.5
 """
 
 from src.main import main

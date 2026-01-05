@@ -1,10 +1,10 @@
-# RedisM v1.0.4
+# RedisM v1.0.5
 
 <div align="center">
 
 **现代化的Redis管理工具**
 
-[![Version](https://img.shields.io/badge/version-1.0.4-blue.svg)](#)
+[![Version](https://img.shields.io/badge/version-1.0.5-blue.svg)](#)
 [![Python](https://img.shields.io/badge/python-3.8+-green.svg)](https://python.org)
 [![Redis](https://img.shields.io/badge/Redis-5.0+-red.svg)](https://redis.io)
 [![Platform](https://img.shields.io/badge/platform-macOS%20%7C%20Linux%20%7C%20Windows-lightgrey.svg)](#)
@@ -42,9 +42,11 @@
 ### 🎨 用户界面
 - **现代设计**: 简洁美观的现代化界面设计
 - **双面板布局**: 优化的Redis服务器信息显示，充分利用屏幕空间
-- **响应式布局**: 自适应窗口大小的响应式界面布局
+- **响应式布局**: 自适应窗口大小的响应式界面布局，防止UI元素被压缩
+- **固定高度控制**: 关键UI控件（按钮、输入框）采用固定高度设计，确保始终可见和可操作
 - **丰富交互**: 鼠标悬停效果、右键菜单、键盘快捷键
 - **搜索功能**: 所有文本编辑窗口支持⌘F快速搜索
+- **无干扰操作**: 禁用了意外的鼠标滚轮标签切换，提供更稳定的操作体验
 
 ### 💻 开发工具
 - **命令行界面**: 内置完整的Redis命令行，支持所有Redis命令
@@ -216,7 +218,38 @@ RedisM/
 
 ## 📝 更新日志
 
-### v1.0.4 (2024-12-31) - 当前版本
+### v1.0.5 (2025-01-05) - 当前版本
+- � **修复**:: 关键UI布局问题，显著提升用户体验
+  - 修复Add New Key对话框数据类型选择区域在小窗口中被压缩的问题
+  - 修复Key Manager值区域JSON格式化按钮和搜索控件被隐藏的问题
+  - 应用一致的固定高度策略，防止UI元素压缩
+  - 改进网格布局权重配置，实现真正的自适应调整
+
+- 🐛 **修复**: Hash编辑对话框关键错误
+  - 解决"HashEditDialog object has no attribute 'old_value'"错误
+  - 纠正hash操作逻辑（之前错误地使用了set操作）
+  - 添加适当的字段名验证和变更处理
+  - 修复hash操作的成功消息和错误处理
+
+- 🚫 **优化**: 标签导航体验
+  - 完全禁用鼠标滚轮标签切换功能
+  - 移除Key Manager和Command Line标签间的意外切换
+  - 保留内容区域的正常滚动功能
+  - 通过防止意外标签更改提升用户体验
+
+- 🎨 **简化**: Key Manager窗口布局
+  - 移除Key Manager窗口中不必要的滚动条
+  - 简化布局，移除基于Canvas的滚动框架
+  - 提升性能和视觉清晰度
+  - 保持内容区域的适当自动调整行为
+
+- ✨ **增强**: 数据类型选择和结构化数据显示
+  - 改进Add New Key对话框布局，数据类型单选按钮改为单行显示
+  - 增加最小窗口尺寸确保所有控件保持可见
+  - 为hash、list、set、zset类型应用固定高度过滤区域
+  - 确保操作按钮（添加项目、删除项目、全部更新、刷新）始终可访问
+
+### v1.0.4 (2024-12-31)
 - 🔄 **新增**: 智能自动重连功能，连接断开时自动重连并继续操作
 - 🗄️ **修复**: 数据库切换时键列表显示旧数据的问题
 - 🎨 **优化**: Redis服务器信息双面板布局，充分利用屏幕空间
@@ -300,6 +333,8 @@ python main.py
 - ✅ 确保Python环境支持tkinter
 - ✅ 检查显示器分辨率和缩放设置
 - ✅ 尝试调整窗口大小
+- ✅ 如果UI元素被压缩，尝试增大窗口尺寸
+- ✅ 重启应用以确保最新的布局修复生效
 
 ### 获取帮助
 1. 查看 [docs/](docs/) 目录下的详细技术文档
@@ -322,10 +357,10 @@ python main.py
 
 <div align="center">
 
-**RedisM v1.0.4** - 让Redis管理变得简单而优雅 ✨
+**RedisM v1.0.5** - 让Redis管理变得简单而优雅 ✨
 
 Made with ❤️ for Redis developers worldwide
 
-[⬆️ 回到顶部](#redism-v104)
+[⬆️ 回到顶部](#redism-v105)
 
 </div>
