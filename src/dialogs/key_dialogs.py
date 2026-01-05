@@ -843,8 +843,8 @@ class AddZSetDialog(BaseDialog):
             messagebox.showerror("Error", f"Failed to add zset member: {e}")
 
 
-class AddNewKeyDialog(BaseDialog):
-    """添加新键对话框"""
+class AddNewKeyDialog(SimpleDialog):
+    """添加新键对话框 - 使用SimpleDialog实现真正的自适应"""
     
     def __init__(self, parent, main_window):
         self.main_window = main_window
@@ -855,17 +855,20 @@ class AddNewKeyDialog(BaseDialog):
     
     def _setup_ui(self):
         """设置UI"""
-        # 键名输入
-        key_frame = ttk.LabelFrame(self.scrollable_frame, text="Key Name")
-        key_frame.pack(fill=tk.X, padx=10, pady=(10, 5))
+        # 固定区域：键名输入
+        key_section = self.create_fixed_section(0)
+        key_frame = ttk.LabelFrame(key_section, text="Key Name")
+        key_frame.grid(row=0, column=0, sticky="ew", padx=10, pady=(10, 5))
+        key_frame.grid_columnconfigure(0, weight=1)
         
         self.key_var = tk.StringVar()
         key_entry = ttk.Entry(key_frame, textvariable=self.key_var, font=('Arial', 11))
         key_entry.pack(fill=tk.X, padx=5, pady=5)
         
-        # 数据类型选择
-        type_frame = ttk.LabelFrame(self.scrollable_frame, text="Data Type")
-        type_frame.pack(fill=tk.X, padx=10, pady=5)
+        # 固定区域：数据类型选择
+        type_section = self.create_fixed_section(1)
+        type_frame = ttk.LabelFrame(type_section, text="Data Type")
+        type_frame.grid(row=0, column=0, sticky="ew", padx=10, pady=5)
         
         self.type_var = tk.StringVar(value="string")
         type_inner = ttk.Frame(type_frame)
@@ -883,9 +886,10 @@ class AddNewKeyDialog(BaseDialog):
         ttk.Radiobutton(type_inner, text="ZSet", variable=self.type_var, 
                        value="zset", command=self._on_type_change).pack(side=tk.LEFT)
         
-        # TTL设置
-        ttl_frame = ttk.LabelFrame(self.scrollable_frame, text="TTL (Time To Live)")
-        ttl_frame.pack(fill=tk.X, padx=10, pady=5)
+        # 固定区域：TTL设置
+        ttl_section = self.create_fixed_section(2)
+        ttl_frame = ttk.LabelFrame(ttl_section, text="TTL (Time To Live)")
+        ttl_frame.grid(row=0, column=0, sticky="ew", padx=10, pady=5)
         
         ttl_inner = ttk.Frame(ttl_frame)
         ttl_inner.pack(fill=tk.X, padx=5, pady=5)
@@ -898,14 +902,17 @@ class AddNewKeyDialog(BaseDialog):
         ttl_entry.pack(side=tk.LEFT, padx=(10, 5))
         ttk.Label(ttl_inner, text="seconds").pack(side=tk.LEFT)
         
-        # 值输入区域
-        self.value_frame = ttk.LabelFrame(self.scrollable_frame, text="Value")
-        self.value_frame.pack(fill=tk.BOTH, expand=True, padx=10, pady=5)
+        # 可扩展区域：值输入区域
+        value_section = self.create_expandable_section(3)
+        self.value_frame = ttk.LabelFrame(value_section, text="Value")
+        self.value_frame.grid(row=0, column=0, sticky="nsew", padx=10, pady=5)
+        self.value_frame.grid_rowconfigure(0, weight=1)
+        self.value_frame.grid_columnconfigure(0, weight=1)
         
         # 初始化为String类型的输入
         self._setup_string_input()
         
-        # 按钮
+        # 固定区域：按钮
         self._create_buttons()
         
         # 设置焦点
@@ -935,86 +942,152 @@ class AddNewKeyDialog(BaseDialog):
     
     def _setup_string_input(self):
         """设置String类型输入"""
+        # 清空当前内容
+        for widget in self.value_frame.winfo_children():
+            widget.destroy()
+        
+        # 配置value_frame的grid权重
+        self.value_frame.grid_rowconfigure(1, weight=1)  # 文本区域可扩展
+        self.value_frame.grid_columnconfigure(0, weight=1)
+        
         # JSON格式化按钮
         json_btn_frame = ttk.Frame(self.value_frame)
-        json_btn_frame.pack(fill=tk.X, padx=5, pady=5)
+        json_btn_frame.grid(row=0, column=0, sticky="ew", padx=5, pady=5)
         
         ttk.Button(json_btn_frame, text="Format JSON", 
                   command=self._format_json).pack(side=tk.LEFT, padx=(0, 5))
         ttk.Button(json_btn_frame, text="Minify JSON", 
                   command=self._minify_json).pack(side=tk.LEFT)
         
-        # 文本输入
-        self.string_text, self.string_text_frame = self.create_auto_resize_text(self.value_frame, "", min_height=6, max_height=12)
+        # 文本输入 - 使用自适应高度
+        text_container = ttk.Frame(self.value_frame)
+        text_container.grid(row=1, column=0, sticky="nsew", padx=5, pady=5)
+        text_container.grid_rowconfigure(0, weight=1)
+        text_container.grid_columnconfigure(0, weight=1)
         
-        # 存储文本组件引用以便在resize时使用
+        self.string_text, self.string_text_frame = self.create_auto_text(text_container, "")
+        
+        # 存储文本组件引用
         self._text_widgets = [self.string_text]
     
     def _setup_hash_input(self):
         """设置Hash类型输入"""
+        # 清空当前内容
+        for widget in self.value_frame.winfo_children():
+            widget.destroy()
+        
+        # 配置value_frame的grid权重
+        self.value_frame.grid_rowconfigure(2, weight=1)  # 文本区域可扩展
+        self.value_frame.grid_columnconfigure(0, weight=1)
+        
         # 说明
         ttk.Label(self.value_frame, text="Enter hash fields (one per line): field=value", 
-                 font=('Arial', 10), foreground='#666666').pack(anchor=tk.W, padx=5, pady=(5, 0))
+                 font=('Arial', 10), foreground='#666666').grid(row=0, column=0, sticky="w", padx=5, pady=(5, 0))
         
         # 示例
         example_frame = ttk.Frame(self.value_frame)
-        example_frame.pack(fill=tk.X, padx=5, pady=2)
+        example_frame.grid(row=1, column=0, sticky="ew", padx=5, pady=2)
         ttk.Label(example_frame, text="Example:", font=('Arial', 9, 'bold')).pack(side=tk.LEFT)
         ttk.Label(example_frame, text="name=John Doe", font=('Arial', 9), foreground='#0066CC').pack(side=tk.LEFT, padx=(5, 0))
         
-        # 文本输入
-        self.hash_text, self.hash_text_frame = self.create_auto_resize_text(self.value_frame, "name=\nage=\nemail=", min_height=5, max_height=10)
+        # 文本输入 - 使用自适应高度
+        text_container = ttk.Frame(self.value_frame)
+        text_container.grid(row=2, column=0, sticky="nsew", padx=5, pady=5)
+        text_container.grid_rowconfigure(0, weight=1)
+        text_container.grid_columnconfigure(0, weight=1)
         
-        # 存储文本组件引用以便在resize时使用
+        self.hash_text, self.hash_text_frame = self.create_auto_text(text_container, "name=\nage=\nemail=")
+        
+        # 存储文本组件引用
         self._text_widgets = [self.hash_text]
     
     def _setup_list_input(self):
         """设置List类型输入"""
+        # 清空当前内容
+        for widget in self.value_frame.winfo_children():
+            widget.destroy()
+        
+        # 配置value_frame的grid权重
+        self.value_frame.grid_rowconfigure(1, weight=1)  # 文本区域可扩展
+        self.value_frame.grid_columnconfigure(0, weight=1)
+        
         # 说明
         ttk.Label(self.value_frame, text="Enter list items (one per line):", 
-                 font=('Arial', 10), foreground='#666666').pack(anchor=tk.W, padx=5, pady=(5, 0))
+                 font=('Arial', 10), foreground='#666666').grid(row=0, column=0, sticky="w", padx=5, pady=(5, 0))
         
-        # 文本输入
-        self.list_text, self.list_text_frame = self.create_auto_resize_text(self.value_frame, "item1\nitem2\nitem3", min_height=5, max_height=10)
+        # 文本输入 - 使用自适应高度
+        text_container = ttk.Frame(self.value_frame)
+        text_container.grid(row=1, column=0, sticky="nsew", padx=5, pady=5)
+        text_container.grid_rowconfigure(0, weight=1)
+        text_container.grid_columnconfigure(0, weight=1)
         
-        # 存储文本组件引用以便在resize时使用
+        self.list_text, self.list_text_frame = self.create_auto_text(text_container, "item1\nitem2\nitem3")
+        
+        # 存储文本组件引用
         self._text_widgets = [self.list_text]
     
     def _setup_set_input(self):
         """设置Set类型输入"""
+        # 清空当前内容
+        for widget in self.value_frame.winfo_children():
+            widget.destroy()
+        
+        # 配置value_frame的grid权重
+        self.value_frame.grid_rowconfigure(1, weight=1)  # 文本区域可扩展
+        self.value_frame.grid_columnconfigure(0, weight=1)
+        
         # 说明
         ttk.Label(self.value_frame, text="Enter set members (one per line, duplicates will be ignored):", 
-                 font=('Arial', 10), foreground='#666666').pack(anchor=tk.W, padx=5, pady=(5, 0))
+                 font=('Arial', 10), foreground='#666666').grid(row=0, column=0, sticky="w", padx=5, pady=(5, 0))
         
-        # 文本输入
-        self.set_text, self.set_text_frame = self.create_auto_resize_text(self.value_frame, "member1\nmember2\nmember3", min_height=5, max_height=10)
+        # 文本输入 - 使用自适应高度
+        text_container = ttk.Frame(self.value_frame)
+        text_container.grid(row=1, column=0, sticky="nsew", padx=5, pady=5)
+        text_container.grid_rowconfigure(0, weight=1)
+        text_container.grid_columnconfigure(0, weight=1)
         
-        # 存储文本组件引用以便在resize时使用
+        self.set_text, self.set_text_frame = self.create_auto_text(text_container, "member1\nmember2\nmember3")
+        
+        # 存储文本组件引用
         self._text_widgets = [self.set_text]
     
     def _setup_zset_input(self):
         """设置ZSet类型输入"""
+        # 清空当前内容
+        for widget in self.value_frame.winfo_children():
+            widget.destroy()
+        
+        # 配置value_frame的grid权重
+        self.value_frame.grid_rowconfigure(2, weight=1)  # 文本区域可扩展
+        self.value_frame.grid_columnconfigure(0, weight=1)
+        
         # 说明
         ttl_label = ttk.Label(self.value_frame, text="Enter sorted set members (one per line): score member", 
                              font=('Arial', 10), foreground='#666666')
-        ttl_label.pack(anchor=tk.W, padx=5, pady=(5, 0))
+        ttl_label.grid(row=0, column=0, sticky="w", padx=5, pady=(5, 0))
         
         # 示例
         example_frame = ttk.Frame(self.value_frame)
-        example_frame.pack(fill=tk.X, padx=5, pady=2)
+        example_frame.grid(row=1, column=0, sticky="ew", padx=5, pady=2)
         ttk.Label(example_frame, text="Example:", font=('Arial', 9, 'bold')).pack(side=tk.LEFT)
         ttk.Label(example_frame, text="100 player1", font=('Arial', 9), foreground='#0066CC').pack(side=tk.LEFT, padx=(5, 0))
         
-        # 文本输入
-        self.zset_text, self.zset_text_frame = self.create_auto_resize_text(self.value_frame, "100 player1\n90 player2\n80 player3", min_height=5, max_height=10)
+        # 文本输入 - 使用自适应高度
+        text_container = ttk.Frame(self.value_frame)
+        text_container.grid(row=2, column=0, sticky="nsew", padx=5, pady=5)
+        text_container.grid_rowconfigure(0, weight=1)
+        text_container.grid_columnconfigure(0, weight=1)
         
-        # 存储文本组件引用以便在resize时使用
+        self.zset_text, self.zset_text_frame = self.create_auto_text(text_container, "100 player1\n90 player2\n80 player3")
+        
+        # 存储文本组件引用
         self._text_widgets = [self.zset_text]
     
     def _create_buttons(self):
         """创建按钮"""
-        btn_frame = ttk.Frame(self.scrollable_frame)
-        btn_frame.pack(fill=tk.X, padx=10, pady=10)
+        btn_section = self.create_fixed_section(4)
+        btn_frame = ttk.Frame(btn_section)
+        btn_frame.grid(row=0, column=0, sticky="ew", padx=10, pady=10)
         
         ttk.Button(btn_frame, text="Create Key", command=self._create_key).pack(side=tk.RIGHT, padx=(5, 0))
         ttk.Button(btn_frame, text="Cancel", command=lambda: self.close()).pack(side=tk.RIGHT)

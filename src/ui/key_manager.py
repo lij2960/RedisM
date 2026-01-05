@@ -24,12 +24,76 @@ class KeyManager:
         self._setup_ui()
     
     def _setup_ui(self):
-        """设置UI"""
-        self.key_details_frame = ttk.Frame(self.parent)
-        self.key_details_frame.pack(fill=tk.BOTH, expand=True)
+        """设置UI - 使用SimpleDialog风格的布局实现真正的自适应"""
+        # 配置父容器的grid权重 - 支持灵活的section配置
+        self.parent.grid_rowconfigure(0, weight=1)  # 主要内容区域可扩展
+        self.parent.grid_columnconfigure(0, weight=1)
+        
+        # 创建主容器
+        self.main_container = ttk.Frame(self.parent)
+        self.main_container.grid(row=0, column=0, sticky="nsew", padx=15, pady=15)
+        
+        # 配置主容器的grid权重
+        self.main_container.grid_rowconfigure(0, weight=1)  # 内容区域可扩展
+        self.main_container.grid_columnconfigure(0, weight=1)
+        
+        # 创建内容框架
+        self.key_details_frame = ttk.Frame(self.main_container)
+        self.key_details_frame.grid(row=0, column=0, sticky="nsew")
         
         # 初始提示
         self._show_welcome()
+    
+    def _create_fixed_section(self, row):
+        """创建固定高度的区域"""
+        section = ttk.Frame(self.key_details_frame)
+        section.grid(row=row, column=0, sticky="ew", pady=5)
+        section.grid_columnconfigure(0, weight=1)
+        return section
+    
+    def _create_expandable_section(self, row):
+        """创建可扩展的区域"""
+        section = ttk.Frame(self.key_details_frame)
+        section.grid(row=row, column=0, sticky="nsew", pady=5)
+        section.grid_rowconfigure(0, weight=1)
+        section.grid_columnconfigure(0, weight=1)
+        return section
+    
+    def _create_auto_text(self, parent, initial_text="", **kwargs):
+        """创建真正自适应的文本组件"""
+        # 创建文本框架
+        text_frame = ttk.Frame(parent)
+        text_frame.grid(row=0, column=0, sticky="nsew")
+        
+        # 配置grid权重
+        text_frame.grid_rowconfigure(0, weight=1)
+        text_frame.grid_columnconfigure(0, weight=1)
+        
+        # 创建文本组件 - 不设置height，让grid管理大小
+        text_widget = tk.Text(text_frame, wrap=tk.WORD, **kwargs)
+        text_widget.grid(row=0, column=0, sticky="nsew")
+        
+        # 插入初始文本
+        if initial_text:
+            text_widget.insert(tk.END, initial_text)
+        
+        # 创建滚动条
+        text_scroll = ttk.Scrollbar(text_frame, orient=tk.VERTICAL, command=text_widget.yview)
+        text_scroll.grid(row=0, column=1, sticky="ns")
+        text_widget.configure(yscrollcommand=text_scroll.set)
+        
+        # 添加搜索功能 - 添加搜索按钮到父容器
+        search_frame = ttk.Frame(parent)
+        search_frame.grid(row=1, column=0, sticky="ew")
+        
+        ttk.Button(search_frame, text="🔍 Search (⌘F)", 
+                  command=lambda: self._show_search_dialog()).pack(side=tk.RIGHT)
+        
+        # 绑定⌘F快捷键
+        text_widget.bind('<Command-f>', lambda e: self._show_search_dialog())
+        text_widget.bind('<Command-F>', lambda e: self._show_search_dialog())
+        
+        return text_widget, text_frame
     
     def _show_welcome(self):
         """显示Redis服务器信息"""
@@ -330,17 +394,22 @@ class KeyManager:
         threading.Thread(target=load_thread, daemon=True).start()
     
     def _show_key_details(self, key, key_info, value):
-        """显示键详情"""
+        """显示键详情 - 使用section布局实现真正的自适应"""
         # 清空详情框架
         for widget in self.key_details_frame.winfo_children():
             widget.destroy()
         
+        # 配置key_details_frame的grid权重
+        self.key_details_frame.grid_rowconfigure(2, weight=1)  # 值区域可扩展
+        self.key_details_frame.grid_columnconfigure(0, weight=1)
+        
         key_type = key_info['type']
         ttl = key_info['ttl']
         
-        # 键信息 - 显示完整键名
-        info_frame = ttk.Frame(self.key_details_frame)
-        info_frame.pack(fill=tk.X, padx=5, pady=5)
+        # 固定区域：键信息 (第0行)
+        info_section = self._create_fixed_section(0)
+        info_frame = ttk.Frame(info_section)
+        info_frame.grid(row=0, column=0, sticky="ew", padx=5, pady=5)
         
         # 使用文本框显示完整键名
         ttk.Label(info_frame, text="Key:").pack(anchor=tk.W)
@@ -353,9 +422,10 @@ class KeyManager:
         ttl_text = ttl if ttl > 0 else 'Never expires'
         ttk.Label(info_frame, text=f"TTL: {ttl_text}").pack(anchor=tk.W)
         
-        # 查询框架
-        query_frame = ttk.LabelFrame(self.key_details_frame, text="Query & Edit")
-        query_frame.pack(fill=tk.X, padx=5, pady=5)
+        # 固定区域：查询框架 (第1行)
+        query_section = self._create_fixed_section(1)
+        query_frame = ttk.LabelFrame(query_section, text="Query & Edit")
+        query_frame.grid(row=0, column=0, sticky="ew", padx=5, pady=5)
         
         # 查询输入
         query_input_frame = ttk.Frame(query_frame)
@@ -370,9 +440,12 @@ class KeyManager:
         ttk.Button(query_input_frame, text="Query", 
                   command=lambda: self._execute_key_query(key, key_type)).pack(side=tk.RIGHT)
         
-        # 值编辑区域
-        value_frame = ttk.LabelFrame(self.key_details_frame, text="Value")
-        value_frame.pack(fill=tk.BOTH, expand=True, padx=5, pady=5)
+        # 可扩展区域：值编辑区域 (第2行，可扩展)
+        value_section = self._create_expandable_section(2)
+        value_frame = ttk.LabelFrame(value_section, text="Value")
+        value_frame.grid(row=0, column=0, sticky="nsew", padx=5, pady=5)
+        value_frame.grid_rowconfigure(0, weight=1)
+        value_frame.grid_columnconfigure(0, weight=1)
         
         # 根据数据类型选择显示方式
         if key_type in ['list', 'set', 'zset', 'hash']:
@@ -380,28 +453,39 @@ class KeyManager:
         else:
             self._show_text_value(value_frame, key, key_type, value)
         
-        # 操作按钮
+        # 固定区域：操作按钮 (第3行)
         self._create_action_buttons(key, key_type)
     
     def _show_structured_value(self, parent, key, key_type, value):
-        """显示结构化数据（表格形式）"""
+        """显示结构化数据（表格形式） - 使用grid布局"""
+        # 配置父容器的grid权重
+        parent.grid_rowconfigure(1, weight=1)  # 表格区域可扩展
+        parent.grid_columnconfigure(0, weight=1)
+        
         # 清理之前的过滤状态标签
         if hasattr(self, 'filter_status_label'):
             self.filter_status_label.destroy()
             delattr(self, 'filter_status_label')
         
-        # 查询框架
+        # 查询框架 (第0行)
         query_frame = ttk.Frame(parent)
-        query_frame.pack(fill=tk.X, padx=5, pady=5)
+        query_frame.grid(row=0, column=0, sticky="ew", padx=5, pady=5)
         
         # 根据类型创建过滤输入
         self._create_filter_input(query_frame, key, key_type)
         
-        # 表格显示
-        self._create_data_table(parent, key, key_type, value)
+        # 表格显示 (第1行，可扩展)
+        table_container = ttk.Frame(parent)
+        table_container.grid(row=1, column=0, sticky="nsew", padx=5, pady=5)
+        table_container.grid_rowconfigure(0, weight=1)
+        table_container.grid_columnconfigure(0, weight=1)
         
-        # 操作按钮
-        self._create_table_buttons(parent, key, key_type)
+        self._create_data_table(table_container, key, key_type, value)
+        
+        # 操作按钮 (第2行)
+        btn_container = ttk.Frame(parent)
+        btn_container.grid(row=2, column=0, sticky="ew", padx=5, pady=5)
+        self._create_table_buttons(btn_container, key, key_type)
     
     def _create_filter_input(self, parent, key, key_type):
         """创建过滤输入"""
@@ -431,9 +515,17 @@ class KeyManager:
                       command=lambda: self._filter_set_data(key)).pack(side=tk.RIGHT)
     
     def _create_data_table(self, parent, key, key_type, value):
-        """创建数据表格"""
+        """创建数据表格 - 使用grid布局"""
+        # 配置父容器的grid权重
+        parent.grid_rowconfigure(0, weight=1)
+        parent.grid_columnconfigure(0, weight=1)
+        
         table_frame = ttk.Frame(parent)
-        table_frame.pack(fill=tk.BOTH, expand=True, padx=5, pady=5)
+        table_frame.grid(row=0, column=0, sticky="nsew")
+        
+        # 配置table_frame的grid权重
+        table_frame.grid_rowconfigure(0, weight=1)
+        table_frame.grid_columnconfigure(0, weight=1)
         
         # 配置Treeview样式
         style_name = self.main_window.style_manager.configure_treeview_style(key_type)
@@ -486,11 +578,11 @@ class KeyManager:
             self.original_zset_data = value if isinstance(value, list) else []
             self._load_zset_data_to_tree(self.original_zset_data)
         
-        self.data_tree.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
+        self.data_tree.grid(row=0, column=0, sticky="nsew")
         
         # 滚动条
         tree_scroll = ttk.Scrollbar(table_frame, orient=tk.VERTICAL, command=self.data_tree.yview)
-        tree_scroll.pack(side=tk.RIGHT, fill=tk.Y)
+        tree_scroll.grid(row=0, column=1, sticky="ns")
         self.data_tree.configure(yscrollcommand=tree_scroll.set)
         
         # 绑定双击事件和右键菜单
@@ -501,7 +593,7 @@ class KeyManager:
     def _create_table_buttons(self, parent, key, key_type):
         """创建表格操作按钮"""
         btn_frame = ttk.Frame(parent)
-        btn_frame.pack(fill=tk.X, padx=5, pady=5)
+        btn_frame.grid(row=0, column=0, sticky="ew", padx=5, pady=5)
         
         ttk.Button(btn_frame, text="Add Item", 
                   command=lambda: self._add_table_item(key, key_type)).pack(side=tk.LEFT, padx=(0, 5))
@@ -513,43 +605,37 @@ class KeyManager:
                   command=lambda: self.load_key_details(key)).pack(side=tk.LEFT)
     
     def _show_text_value(self, parent, key, key_type, value):
-        """显示文本数据"""
-        # JSON格式化按钮
+        """显示文本数据 - 使用SimpleDialog风格的自适应布局"""
+        # 配置父容器的grid权重
+        parent.grid_rowconfigure(1, weight=1)  # 文本区域可扩展
+        parent.grid_columnconfigure(0, weight=1)
+        
+        # 固定区域：JSON格式化按钮 (第0行)
         format_frame = ttk.Frame(parent)
-        format_frame.pack(fill=tk.X, padx=5, pady=5)
+        format_frame.grid(row=0, column=0, sticky="ew", padx=5, pady=5)
         
         ttk.Button(format_frame, text="Format JSON", 
                   command=lambda: self._format_json_value()).pack(side=tk.LEFT, padx=(0, 5))
         ttk.Button(format_frame, text="Minify JSON", 
                   command=lambda: self._minify_json_value()).pack(side=tk.LEFT)
         
-        # 搜索按钮
-        ttk.Button(format_frame, text="🔍 Search (⌘F)", 
-                  command=lambda: self._show_search_dialog()).pack(side=tk.RIGHT)
+        # 可扩展区域：文本编辑器 (第1行，可扩展)
+        text_container = ttk.Frame(parent)
+        text_container.grid(row=1, column=0, sticky="nsew", padx=5, pady=5)
+        text_container.grid_rowconfigure(0, weight=1)  # 文本区域
+        text_container.grid_rowconfigure(1, weight=0)  # 搜索按钮区域
+        text_container.grid_columnconfigure(0, weight=1)
         
-        # 文本编辑器
-        text_frame = ttk.Frame(parent)
-        text_frame.pack(fill=tk.BOTH, expand=True, padx=5, pady=5)
-        
-        self.value_text = tk.Text(text_frame, wrap=tk.WORD)
-        self.value_text.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
-        self.value_text.insert(tk.END, str(value))
-        
-        value_scroll = ttk.Scrollbar(text_frame, orient=tk.VERTICAL, command=self.value_text.yview)
-        value_scroll.pack(side=tk.RIGHT, fill=tk.Y)
-        self.value_text.configure(yscrollcommand=value_scroll.set)
-        
-        # 绑定⌘F快捷键
-        self.value_text.bind('<Command-f>', lambda e: self._show_search_dialog())
-        self.value_text.bind('<Command-F>', lambda e: self._show_search_dialog())
+        self.value_text, self.text_frame = self._create_auto_text(text_container, str(value))
         
         # 确保文本框能接收焦点和键盘事件
         self.value_text.focus_set()
     
     def _create_action_buttons(self, key, key_type):
         """创建操作按钮"""
-        btn_frame = ttk.Frame(self.key_details_frame)
-        btn_frame.pack(fill=tk.X, padx=5, pady=5)
+        btn_section = self._create_fixed_section(3)
+        btn_frame = ttk.Frame(btn_section)
+        btn_frame.grid(row=0, column=0, sticky="ew", padx=5, pady=5)
         
         ttk.Button(btn_frame, text="Update", 
                   command=lambda: self._update_key(key, key_type)).pack(side=tk.LEFT, padx=(0, 5))
