@@ -526,7 +526,8 @@ class KeyManager:
     def _create_data_table(self, parent, key, key_type, value):
         """创建数据表格 - 使用grid布局"""
         # 配置父容器的grid权重
-        parent.grid_rowconfigure(0, weight=1)
+        parent.grid_rowconfigure(0, weight=1)  # 表格区域可扩展
+        parent.grid_rowconfigure(1, weight=0)  # 状态标签区域固定高度
         parent.grid_columnconfigure(0, weight=1)
         
         table_frame = ttk.Frame(parent)
@@ -798,13 +799,16 @@ class KeyManager:
         if hasattr(self, 'filter_status_label'):
             self.filter_status_label.destroy()
         
-        parent_frame = self.data_tree.master.master
+        # 找到正确的父容器 - 应该是table_container (data_tree.master.master)
+        table_frame = self.data_tree.master  # table_frame
+        parent_frame = table_frame.master    # table_container
         self.filter_status_label = ttk.Label(parent_frame, 
                                             text=f"Showing {filtered_count} of {total_count} items" + 
                                                  (f" (filtered by: '{filter_text}')" if filter_text else ""),
                                             font=self.main_window.style_manager.get_font(FONT_SIZE_SMALL),
                                             foreground='#666666')
-        self.filter_status_label.pack(pady=(5, 0))
+        # 使用grid布局，放在表格下方
+        self.filter_status_label.grid(row=1, column=0, sticky="w", padx=5, pady=(5, 0))
     
     # 编辑和操作方法
     def _edit_table_item(self, key, key_type):
