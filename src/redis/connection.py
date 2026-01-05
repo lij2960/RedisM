@@ -27,6 +27,7 @@ class RedisConnection:
         self.keepalive_thread = None
         self.keepalive_running = False
         self.current_conn = None
+        self.current_database = 0  # 跟踪当前选择的数据库
         
     def connect(self, conn_config):
         """连接到Redis"""
@@ -96,6 +97,14 @@ class RedisConnection:
         """检查是否已连接"""
         return self.redis_client is not None
     
+    def set_current_database(self, db_num):
+        """设置当前数据库编号"""
+        self.current_database = db_num
+    
+    def get_current_database(self):
+        """获取当前数据库编号"""
+        return self.current_database
+    
     def check_and_reconnect(self):
         """检查连接状态，如果断开则尝试自动重连"""
         try:
@@ -112,8 +121,19 @@ class RedisConnection:
             if self.current_conn:
                 try:
                     print("Attempting to reconnect...")
+                    # 记住当前数据库
+                    previous_db = self.current_database
+                    
+                    # 重新连接
                     self.connect(self.current_conn)
-                    print("Reconnection successful")
+                    
+                    # 恢复到之前选择的数据库
+                    if previous_db != 0:
+                        print(f"Restoring to database {previous_db}")
+                        self.redis_client.execute_command('SELECT', previous_db)
+                        self.current_database = previous_db
+                    
+                    print(f"Reconnection successful, restored to database {previous_db}")
                     return True
                 except Exception as reconnect_error:
                     print(f"Reconnection failed: {reconnect_error}")

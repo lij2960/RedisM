@@ -308,6 +308,9 @@ class LeftPanel:
         if selection:
             self.main_window.current_conn_index = selection[0]
         
+        # 设置初始数据库为0
+        self.main_window.redis_conn.set_current_database(0)
+        
         self.main_window.right_panel.update_status(f"✅ Connected to {self.main_window.current_conn['name']}")
         self.connect_btn.config(text="✅ Connected", state="disabled")
         self.disconnect_btn.config(state="normal")
@@ -356,6 +359,9 @@ class LeftPanel:
             
             # 切换数据库
             redis_client.execute_command('SELECT', db_num)
+            
+            # 通知连接管理器当前数据库已改变
+            self.main_window.redis_conn.set_current_database(db_num)
             
             # 清空当前的键数据和状态
             self.current_keys = []
@@ -465,6 +471,17 @@ class LeftPanel:
                 display_name = conn['name']
             self.conn_listbox.insert(tk.END, display_name)
     
+    def restore_database_selection_after_reconnect(self):
+        """重连后恢复数据库选择显示"""
+        try:
+            current_db = self.main_window.redis_conn.get_current_database()
+            # 更新UI显示的数据库选择
+            self.db_var.set(f"DB {current_db}")
+            # 重新搜索键以显示正确的数据
+            self.search_keys_with_db_client(current_db)
+        except Exception as e:
+            print(f"Error restoring database selection: {e}")
+    
     def _on_search_click(self):
         """搜索按钮点击处理 - 提供视觉反馈"""
         # 临时改变按钮文本，显示正在搜索
@@ -548,6 +565,10 @@ class LeftPanel:
                         # 尝试重连
                         if self.main_window.redis_conn.check_and_reconnect():
                             self.main_window.root.after(0, lambda: self.main_window.right_panel.update_status("🔄 Reconnected, retrying key search..."))
+                            
+                            # 恢复数据库选择显示
+                            self.main_window.root.after(0, self.restore_database_selection_after_reconnect)
+                            
                             # 重试搜索 - 使用最新的连接
                             fresh_redis_client = self.main_window.get_redis_client()
                             redis_ops = RedisOperations(fresh_redis_client)
@@ -557,7 +578,8 @@ class LeftPanel:
                             self.main_window.root.after(0, lambda: self._update_keys_tree(keys))
                             
                             key_count = len(keys) if keys else 0
-                            self.main_window.root.after(0, lambda: self.main_window.right_panel.update_status(f"✅ Keys loaded after reconnection ({key_count} found)"))
+                            current_db = self.main_window.redis_conn.get_current_database()
+                            self.main_window.root.after(0, lambda: self.main_window.right_panel.update_status(f"✅ Keys loaded after reconnection ({key_count} found in DB {current_db})"))
                             return
                     except Exception as retry_e:
                         error_msg = f"Failed to search keys after reconnection: {str(retry_e)}"
