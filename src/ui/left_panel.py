@@ -55,6 +55,10 @@ class LeftPanel:
         list_frame = ttk.Frame(conn_frame)
         list_frame.pack(fill=tk.X, pady=(0, 10))
         
+        # 配置grid布局以支持滚动条
+        list_frame.grid_rowconfigure(0, weight=1)
+        list_frame.grid_columnconfigure(0, weight=1)
+        
         # 连接列表
         self.conn_listbox = tk.Listbox(list_frame, height=6, 
                                       font=self.main_window.style_manager.get_font(),
@@ -63,7 +67,19 @@ class LeftPanel:
                                       relief='flat', borderwidth=0, 
                                       highlightthickness=1,
                                       highlightcolor=SELECTED_COLOR)
-        self.conn_listbox.pack(fill=tk.X)
+        self.conn_listbox.grid(row=0, column=0, sticky="nsew")
+        
+        # 添加垂直滚动条
+        conn_v_scrollbar = ttk.Scrollbar(list_frame, orient="vertical", command=self.conn_listbox.yview)
+        conn_v_scrollbar.grid(row=0, column=1, sticky="ns")
+        self.conn_listbox.configure(yscrollcommand=conn_v_scrollbar.set)
+        
+        # 添加水平滚动条
+        conn_h_scrollbar = ttk.Scrollbar(list_frame, orient="horizontal", command=self.conn_listbox.xview)
+        conn_h_scrollbar.grid(row=1, column=0, sticky="ew")
+        self.conn_listbox.configure(xscrollcommand=conn_h_scrollbar.set)
+        
+        # 绑定事件
         self.conn_listbox.bind('<<ListboxSelect>>', self._on_connection_select)
         self.conn_listbox.bind('<Double-1>', self._on_connection_double_click)
         
