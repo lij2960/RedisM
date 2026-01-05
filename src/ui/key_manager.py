@@ -82,12 +82,13 @@ class KeyManager:
         text_scroll.grid(row=0, column=1, sticky="ns")
         text_widget.configure(yscrollcommand=text_scroll.set)
         
-        # 添加搜索功能 - 添加搜索按钮到父容器
-        search_frame = ttk.Frame(parent)
+        # 添加搜索功能 - 添加搜索按钮到父容器，设置固定高度
+        search_frame = ttk.Frame(parent, height=35)  # 设置固定高度35像素
         search_frame.grid(row=1, column=0, sticky="ew")
+        search_frame.pack_propagate(False)  # 防止子组件改变父容器大小
         
         ttk.Button(search_frame, text="🔍 Search (⌘F)", 
-                  command=lambda: self._show_search_dialog()).pack(side=tk.RIGHT)
+                  command=lambda: self._show_search_dialog()).pack(side=tk.RIGHT, pady=5)
         
         # 绑定⌘F快捷键
         text_widget.bind('<Command-f>', lambda e: self._show_search_dialog())
@@ -399,8 +400,12 @@ class KeyManager:
         for widget in self.key_details_frame.winfo_children():
             widget.destroy()
         
-        # 配置key_details_frame的grid权重
-        self.key_details_frame.grid_rowconfigure(2, weight=1)  # 值区域可扩展
+        # 重新配置key_details_frame的grid权重 - 确保只有值区域可扩展
+        for i in range(10):
+            if i == 2:  # 值区域(第2行)可扩展
+                self.key_details_frame.grid_rowconfigure(i, weight=1)
+            else:
+                self.key_details_frame.grid_rowconfigure(i, weight=0)
         self.key_details_frame.grid_columnconfigure(0, weight=1)
         
         key_type = key_info['type']
@@ -422,14 +427,14 @@ class KeyManager:
         ttl_text = ttl if ttl > 0 else 'Never expires'
         ttk.Label(info_frame, text=f"TTL: {ttl_text}").pack(anchor=tk.W)
         
-        # 固定区域：查询框架 (第1行)
+        # 固定区域：查询框架 (第1行) - 固定高度，不随窗口放大而增高
         query_section = self._create_fixed_section(1)
         query_frame = ttk.LabelFrame(query_section, text="Query & Edit")
         query_frame.grid(row=0, column=0, sticky="ew", padx=5, pady=5)
         
-        # 查询输入
+        # 查询输入 - 使用固定高度的布局
         query_input_frame = ttk.Frame(query_frame)
-        query_input_frame.pack(fill=tk.X, padx=5, pady=5)
+        query_input_frame.pack(fill=tk.X, padx=5, pady=8)  # 增加padding但保持固定高度
         
         ttk.Label(query_input_frame, text="Query:").pack(side=tk.LEFT)
         self.query_var = tk.StringVar(value=key)  # 设置默认值为当前键
@@ -457,9 +462,11 @@ class KeyManager:
         self._create_action_buttons(key, key_type)
     
     def _show_structured_value(self, parent, key, key_type, value):
-        """显示结构化数据（表格形式） - 使用grid布局"""
-        # 配置父容器的grid权重
+        """显示结构化数据（表格形式） - 使用固定高度防止filter被挤压"""
+        # 重新配置父容器的grid权重 - 确保只有表格区域可扩展
+        parent.grid_rowconfigure(0, weight=0)  # 查询/过滤区域固定高度
         parent.grid_rowconfigure(1, weight=1)  # 表格区域可扩展
+        parent.grid_rowconfigure(2, weight=0)  # 操作按钮区域固定高度
         parent.grid_columnconfigure(0, weight=1)
         
         # 清理之前的过滤状态标签
@@ -467,14 +474,15 @@ class KeyManager:
             self.filter_status_label.destroy()
             delattr(self, 'filter_status_label')
         
-        # 查询框架 (第0行)
-        query_frame = ttk.Frame(parent)
+        # 固定区域：查询框架 (第0行) - 设置固定高度防止被挤压
+        query_frame = ttk.Frame(parent, height=40)  # 设置固定高度40像素
         query_frame.grid(row=0, column=0, sticky="ew", padx=5, pady=5)
+        query_frame.pack_propagate(False)  # 防止子组件改变父容器大小
         
         # 根据类型创建过滤输入
         self._create_filter_input(query_frame, key, key_type)
         
-        # 表格显示 (第1行，可扩展)
+        # 可扩展区域：表格显示 (第1行，可扩展)
         table_container = ttk.Frame(parent)
         table_container.grid(row=1, column=0, sticky="nsew", padx=5, pady=5)
         table_container.grid_rowconfigure(0, weight=1)
@@ -482,9 +490,10 @@ class KeyManager:
         
         self._create_data_table(table_container, key, key_type, value)
         
-        # 操作按钮 (第2行)
-        btn_container = ttk.Frame(parent)
+        # 固定区域：操作按钮 (第2行) - 设置固定高度
+        btn_container = ttk.Frame(parent, height=40)  # 设置固定高度40像素
         btn_container.grid(row=2, column=0, sticky="ew", padx=5, pady=5)
+        btn_container.pack_propagate(False)  # 防止子组件改变父容器大小
         self._create_table_buttons(btn_container, key, key_type)
     
     def _create_filter_input(self, parent, key, key_type):
@@ -592,27 +601,27 @@ class KeyManager:
     
     def _create_table_buttons(self, parent, key, key_type):
         """创建表格操作按钮"""
-        btn_frame = ttk.Frame(parent)
-        btn_frame.grid(row=0, column=0, sticky="ew", padx=5, pady=5)
-        
-        ttk.Button(btn_frame, text="Add Item", 
-                  command=lambda: self._add_table_item(key, key_type)).pack(side=tk.LEFT, padx=(0, 5))
-        ttk.Button(btn_frame, text="Delete Item", 
+        # 直接在父容器中创建按钮，不再创建额外的frame
+        ttk.Button(parent, text="Add Item", 
+                  command=lambda: self._add_table_item(key, key_type)).pack(side=tk.LEFT, padx=(5, 5))
+        ttk.Button(parent, text="Delete Item", 
                   command=lambda: self._delete_table_item(key, key_type)).pack(side=tk.LEFT, padx=(0, 5))
-        ttk.Button(btn_frame, text="Update All", 
+        ttk.Button(parent, text="Update All", 
                   command=lambda: self._update_structured_key(key, key_type)).pack(side=tk.LEFT, padx=(0, 5))
-        ttk.Button(btn_frame, text="Refresh", 
+        ttk.Button(parent, text="Refresh", 
                   command=lambda: self.load_key_details(key)).pack(side=tk.LEFT)
     
     def _show_text_value(self, parent, key, key_type, value):
-        """显示文本数据 - 使用SimpleDialog风格的自适应布局"""
-        # 配置父容器的grid权重
+        """显示文本数据 - 使用固定高度防止按钮被挤压"""
+        # 重新配置父容器的grid权重 - 确保只有文本区域可扩展
+        parent.grid_rowconfigure(0, weight=0)  # JSON格式化按钮区域固定高度
         parent.grid_rowconfigure(1, weight=1)  # 文本区域可扩展
         parent.grid_columnconfigure(0, weight=1)
         
-        # 固定区域：JSON格式化按钮 (第0行)
-        format_frame = ttk.Frame(parent)
+        # 固定区域：JSON格式化按钮 (第0行) - 设置固定高度防止被挤压
+        format_frame = ttk.Frame(parent, height=40)  # 设置固定高度40像素
         format_frame.grid(row=0, column=0, sticky="ew", padx=5, pady=5)
+        format_frame.pack_propagate(False)  # 防止子组件改变父容器大小
         
         ttk.Button(format_frame, text="Format JSON", 
                   command=lambda: self._format_json_value()).pack(side=tk.LEFT, padx=(0, 5))
@@ -623,7 +632,7 @@ class KeyManager:
         text_container = ttk.Frame(parent)
         text_container.grid(row=1, column=0, sticky="nsew", padx=5, pady=5)
         text_container.grid_rowconfigure(0, weight=1)  # 文本区域
-        text_container.grid_rowconfigure(1, weight=0)  # 搜索按钮区域
+        text_container.grid_rowconfigure(1, weight=0)  # 搜索按钮区域 - 固定高度
         text_container.grid_columnconfigure(0, weight=1)
         
         self.value_text, self.text_frame = self._create_auto_text(text_container, str(value))

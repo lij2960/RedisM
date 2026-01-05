@@ -100,7 +100,12 @@ class HashEditDialog(SimpleDialog):
     
     def _save_changes(self):
         """保存更改"""
+        new_field = self.field_var.get().strip()
         new_value = self.value_text.get(1.0, tk.END).strip()
+        
+        if not new_field:
+            messagebox.showwarning("Warning", "Field name cannot be empty")
+            return
         
         try:
             # 获取Redis客户端
@@ -111,15 +116,18 @@ class HashEditDialog(SimpleDialog):
             
             redis_ops = RedisOperations(redis_client)
             
-            # 删除旧值，添加新值
-            redis_ops.set_remove(self.key, self.old_value)
-            redis_ops.set_add(self.key, new_value)
+            # 如果字段名改变了，删除旧字段
+            if new_field != self.field:
+                redis_ops.hash_delete(self.key, self.field)
             
-            messagebox.showinfo("Success", "Set value updated successfully!")
+            # 设置新的字段值
+            redis_ops.hash_set(self.key, new_field, new_value)
+            
+            messagebox.showinfo("Success", "Hash field updated successfully!")
             self.close(True)
             
         except Exception as e:
-            messagebox.showerror("Error", f"Failed to update set value: {e}")
+            messagebox.showerror("Error", f"Failed to update hash field: {e}")
 
 
 class SetEditDialog(SimpleDialog):
@@ -850,11 +858,21 @@ class AddNewKeyDialog(SimpleDialog):
         self.main_window = main_window
         self._text_widgets = []  # 初始化文本组件列表
         
-        super().__init__(parent, "Add New Key", "700x600")
+        super().__init__(parent, "Add New Key", "700x650")  # 增加默认高度
         self._setup_ui()
+        
+        # 设置更大的最小尺寸以确保data type区域可见
+        self.dialog.minsize(600, 500)
     
     def _setup_ui(self):
         """设置UI"""
+        # 重新配置grid权重 - 只有值输入区域(row 3)可扩展
+        for i in range(10):
+            if i == 3:  # 值输入区域可扩展
+                self.main_container.grid_rowconfigure(i, weight=1)
+            else:
+                self.main_container.grid_rowconfigure(i, weight=0)
+        
         # 固定区域：键名输入
         key_section = self.create_fixed_section(0)
         key_frame = ttk.LabelFrame(key_section, text="Key Name")
@@ -865,24 +883,26 @@ class AddNewKeyDialog(SimpleDialog):
         key_entry = ttk.Entry(key_frame, textvariable=self.key_var, font=('Arial', 11))
         key_entry.pack(fill=tk.X, padx=5, pady=5)
         
-        # 固定区域：数据类型选择
+        # 固定区域：数据类型选择 - 设置固定高度防止被挤压
         type_section = self.create_fixed_section(1)
         type_frame = ttk.LabelFrame(type_section, text="Data Type")
         type_frame.grid(row=0, column=0, sticky="ew", padx=10, pady=5)
         
+        # 设置固定高度的内容区域 - 单行布局
         self.type_var = tk.StringVar(value="string")
-        type_inner = ttk.Frame(type_frame)
-        type_inner.pack(fill=tk.X, padx=5, pady=5)
+        type_inner = ttk.Frame(type_frame, height=40)  # 减少高度到40像素，适合单行
+        type_inner.pack(fill=tk.X, padx=5, pady=8)
+        type_inner.pack_propagate(False)  # 防止子组件改变父容器大小
         
-        # 数据类型单选按钮
+        # 数据类型单选按钮 - 单行布局
         ttk.Radiobutton(type_inner, text="String", variable=self.type_var, 
-                       value="string", command=self._on_type_change).pack(side=tk.LEFT, padx=(0, 15))
+                       value="string", command=self._on_type_change).pack(side=tk.LEFT, padx=(0, 20))
         ttk.Radiobutton(type_inner, text="Hash", variable=self.type_var, 
-                       value="hash", command=self._on_type_change).pack(side=tk.LEFT, padx=(0, 15))
+                       value="hash", command=self._on_type_change).pack(side=tk.LEFT, padx=(0, 20))
         ttk.Radiobutton(type_inner, text="List", variable=self.type_var, 
-                       value="list", command=self._on_type_change).pack(side=tk.LEFT, padx=(0, 15))
+                       value="list", command=self._on_type_change).pack(side=tk.LEFT, padx=(0, 20))
         ttk.Radiobutton(type_inner, text="Set", variable=self.type_var, 
-                       value="set", command=self._on_type_change).pack(side=tk.LEFT, padx=(0, 15))
+                       value="set", command=self._on_type_change).pack(side=tk.LEFT, padx=(0, 20))
         ttk.Radiobutton(type_inner, text="ZSet", variable=self.type_var, 
                        value="zset", command=self._on_type_change).pack(side=tk.LEFT)
         
