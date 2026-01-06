@@ -474,6 +474,16 @@ class KeyManager:
             self.filter_status_label.destroy()
             delattr(self, 'filter_status_label')
         
+        # 先设置原始数据，确保总数统计正确
+        if key_type == 'hash':
+            self.original_hash_data = value if isinstance(value, dict) else {}
+        elif key_type == 'list':
+            self.original_list_data = value if isinstance(value, list) else []
+        elif key_type == 'set':
+            self.original_set_data = list(value) if isinstance(value, (list, set)) else []
+        elif key_type == 'zset':
+            self.original_zset_data = value if isinstance(value, list) else []
+        
         # 固定区域：查询框架 (第0行) - 设置固定高度防止被挤压
         query_frame = ttk.Frame(parent, height=40)  # 设置固定高度40像素
         query_frame.grid(row=0, column=0, sticky="ew", padx=5, pady=5)
@@ -496,32 +506,74 @@ class KeyManager:
         btn_container.pack_propagate(False)  # 防止子组件改变父容器大小
         self._create_table_buttons(btn_container, key, key_type)
     
+    def _update_total_count_display(self, key_type):
+        """更新总数显示"""
+        # 查找并更新总数标签
+        if hasattr(self, 'total_count_label'):
+            if key_type == 'hash':
+                total_count = len(self.original_hash_data) if hasattr(self, 'original_hash_data') else 0
+                self.total_count_label.config(text=f"Total: {total_count} fields")
+            elif key_type == 'list':
+                total_count = len(self.original_list_data) if hasattr(self, 'original_list_data') else 0
+                self.total_count_label.config(text=f"Total: {total_count} items")
+            elif key_type == 'set':
+                total_count = len(self.original_set_data) if hasattr(self, 'original_set_data') else 0
+                self.total_count_label.config(text=f"Total: {total_count} members")
+            elif key_type == 'zset':
+                total_count = len(self.original_zset_data) // 2 if hasattr(self, 'original_zset_data') else 0
+                self.total_count_label.config(text=f"Total: {total_count} members")
+    
     def _create_filter_input(self, parent, key, key_type):
         """创建过滤输入"""
         if key_type == 'hash':
             ttk.Label(parent, text="Hash Key:").pack(side=tk.LEFT)
             self.struct_query_var = tk.StringVar()
-            query_entry = ttk.Entry(parent, textvariable=self.struct_query_var)
-            query_entry.pack(side=tk.LEFT, fill=tk.X, expand=True, padx=(5, 5))
+            query_entry = ttk.Entry(parent, textvariable=self.struct_query_var, width=25)  # 设置固定宽度
+            query_entry.pack(side=tk.LEFT, padx=(5, 5))
             query_entry.bind('<Return>', lambda e: self._filter_hash_data(key))
             ttk.Button(parent, text="Find", 
-                      command=lambda: self._filter_hash_data(key)).pack(side=tk.RIGHT)
+                      command=lambda: self._filter_hash_data(key)).pack(side=tk.LEFT, padx=(0, 10))
+            
+            # 添加总数统计标签
+            total_count = len(self.original_hash_data) if hasattr(self, 'original_hash_data') else 0
+            self.total_count_label = ttk.Label(parent, text=f"Total: {total_count} fields", 
+                                              foreground='#666666')
+            self.total_count_label.pack(side=tk.LEFT)
+            
         elif key_type in ['list', 'zset']:
             ttk.Label(parent, text="Filter:").pack(side=tk.LEFT)
             self.struct_query_var = tk.StringVar()
-            query_entry = ttk.Entry(parent, textvariable=self.struct_query_var)
-            query_entry.pack(side=tk.LEFT, fill=tk.X, expand=True, padx=(5, 5))
+            query_entry = ttk.Entry(parent, textvariable=self.struct_query_var, width=25)  # 设置固定宽度
+            query_entry.pack(side=tk.LEFT, padx=(5, 5))
             query_entry.bind('<Return>', lambda e: self._filter_list_zset_data(key, key_type))
             ttk.Button(parent, text="Find", 
-                      command=lambda: self._filter_list_zset_data(key, key_type)).pack(side=tk.RIGHT)
+                      command=lambda: self._filter_list_zset_data(key, key_type)).pack(side=tk.LEFT, padx=(0, 10))
+            
+            # 添加总数统计标签
+            if key_type == 'list':
+                total_count = len(self.original_list_data) if hasattr(self, 'original_list_data') else 0
+                self.total_count_label = ttk.Label(parent, text=f"Total: {total_count} items", 
+                                                  foreground='#666666')
+            elif key_type == 'zset':
+                total_count = len(self.original_zset_data) // 2 if hasattr(self, 'original_zset_data') else 0
+                self.total_count_label = ttk.Label(parent, text=f"Total: {total_count} members", 
+                                                  foreground='#666666')
+            self.total_count_label.pack(side=tk.LEFT)
+            
         elif key_type == 'set':
             ttk.Label(parent, text="Filter:").pack(side=tk.LEFT)
             self.struct_query_var = tk.StringVar()
-            query_entry = ttk.Entry(parent, textvariable=self.struct_query_var)
-            query_entry.pack(side=tk.LEFT, fill=tk.X, expand=True, padx=(5, 5))
+            query_entry = ttk.Entry(parent, textvariable=self.struct_query_var, width=25)  # 设置固定宽度
+            query_entry.pack(side=tk.LEFT, padx=(5, 5))
             query_entry.bind('<Return>', lambda e: self._filter_set_data(key))
             ttk.Button(parent, text="Find", 
-                      command=lambda: self._filter_set_data(key)).pack(side=tk.RIGHT)
+                      command=lambda: self._filter_set_data(key)).pack(side=tk.LEFT, padx=(0, 10))
+            
+            # 添加总数统计标签
+            total_count = len(self.original_set_data) if hasattr(self, 'original_set_data') else 0
+            self.total_count_label = ttk.Label(parent, text=f"Total: {total_count} members", 
+                                              foreground='#666666')
+            self.total_count_label.pack(side=tk.LEFT)
     
     def _create_data_table(self, parent, key, key_type, value):
         """创建数据表格 - 使用grid布局"""
@@ -550,8 +602,7 @@ class KeyManager:
             self.data_tree.column('Field', width=200, minwidth=100, stretch=True)
             self.data_tree.column('Value', width=400, minwidth=200, stretch=True)
             
-            # 存储原始数据
-            self.original_hash_data = value if isinstance(value, dict) else {}
+            # 加载数据到树形控件（原始数据已在_show_structured_value中设置）
             self._load_hash_data_to_tree(self.original_hash_data)
             
         elif key_type == 'list':
@@ -563,7 +614,7 @@ class KeyManager:
             self.data_tree.column('Index', width=80, minwidth=60, stretch=False)
             self.data_tree.column('Value', width=500, minwidth=200, stretch=True)
             
-            self.original_list_data = value if isinstance(value, list) else []
+            # 加载数据到树形控件（原始数据已在_show_structured_value中设置）
             self._load_list_data_to_tree(self.original_list_data)
             
         elif key_type == 'set':
@@ -573,7 +624,7 @@ class KeyManager:
             # 自适应列宽：Value列占满整个宽度
             self.data_tree.column('Value', width=600, minwidth=200, stretch=True)
             
-            self.original_set_data = list(value) if isinstance(value, (list, set)) else []
+            # 加载数据到树形控件（原始数据已在_show_structured_value中设置）
             self._load_set_data_to_tree(self.original_set_data)
             
         elif key_type == 'zset':
@@ -585,7 +636,7 @@ class KeyManager:
             self.data_tree.column('Score', width=100, minwidth=80, stretch=False)
             self.data_tree.column('Member', width=500, minwidth=200, stretch=True)
             
-            self.original_zset_data = value if isinstance(value, list) else []
+            # 加载数据到树形控件（原始数据已在_show_structured_value中设置）
             self._load_zset_data_to_tree(self.original_zset_data)
         
         self.data_tree.grid(row=0, column=0, sticky="nsew")
@@ -1107,6 +1158,9 @@ class KeyManager:
                     self._filter_list_zset_data(key, key_type)
                 else:
                     self._load_zset_data_to_tree(new_data)
+            
+            # 更新总数显示
+            self._update_total_count_display(key_type)
             
         except Exception as e:
             messagebox.showerror("Error", f"Failed to refresh display: {e}")
