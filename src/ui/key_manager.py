@@ -10,7 +10,7 @@ import json
 
 from ..config import *
 from ..redis.operations import RedisOperations
-from ..utils.helpers import format_json, minify_json
+from ..utils.helpers import format_json, minify_json, apply_json_syntax_highlighting, setup_json_text_widget, format_json_with_highlighting
 from ..dialogs.key_dialogs import HashEditDialog, SetEditDialog, AddHashDialog, ListEditDialog, ZSetEditDialog, AddListDialog, AddSetDialog, AddZSetDialog, AddNewKeyDialog
 
 
@@ -689,6 +689,10 @@ class KeyManager:
         
         self.value_text, self.text_frame = self._create_auto_text(text_container, str(value))
         
+        # 设置JSON文本组件配置和语法高亮
+        setup_json_text_widget(self.value_text)
+        apply_json_syntax_highlighting(self.value_text)
+        
         # 确保文本框能接收焦点和键盘事件
         self.value_text.focus_set()
     
@@ -1302,15 +1306,8 @@ class KeyManager:
     
     def _format_json_value(self):
         """格式化JSON值"""
-        try:
-            current_value = self.value_text.get(1.0, tk.END).strip()
-            formatted = format_json(current_value)
-            self.value_text.delete(1.0, tk.END)
-            self.value_text.insert(1.0, formatted)
-        except ValueError as e:
-            messagebox.showerror("JSON Error", str(e))
-        except Exception as e:
-            messagebox.showerror("Error", f"Failed to format JSON: {e}")
+        if not format_json_with_highlighting(self.value_text):
+            messagebox.showerror("JSON Error", "Invalid JSON format")
     
     def _minify_json_value(self):
         """压缩JSON值"""

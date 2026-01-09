@@ -9,7 +9,7 @@ from tkinter import ttk, messagebox
 from .base_dialog import BaseDialog
 from .simple_dialog import SimpleDialog
 from ..config import *
-from ..utils.helpers import format_json, minify_json
+from ..utils.helpers import format_json, minify_json, apply_json_syntax_highlighting, setup_json_text_widget, format_json_with_highlighting
 from ..redis.operations import RedisOperations
 
 
@@ -76,15 +76,8 @@ class HashEditDialog(SimpleDialog):
     
     def _format_json(self):
         """格式化JSON"""
-        try:
-            current_value = self.value_text.get(1.0, tk.END).strip()
-            formatted = format_json(current_value)
-            self.value_text.delete(1.0, tk.END)
-            self.value_text.insert(1.0, formatted)
-        except ValueError:
+        if not format_json_with_highlighting(self.value_text):
             messagebox.showerror("JSON Error", "Invalid JSON format")
-        except Exception as e:
-            messagebox.showerror("Error", f"Failed to format JSON: {e}")
     
     def _minify_json(self):
         """压缩JSON"""
@@ -189,15 +182,8 @@ class SetEditDialog(SimpleDialog):
     
     def _format_json(self):
         """格式化JSON"""
-        try:
-            current_value = self.value_text.get(1.0, tk.END).strip()
-            formatted = format_json(current_value)
-            self.value_text.delete(1.0, tk.END)
-            self.value_text.insert(1.0, formatted)
-        except ValueError:
+        if not format_json_with_highlighting(self.value_text):
             messagebox.showerror("JSON Error", "Invalid JSON format")
-        except Exception as e:
-            messagebox.showerror("Error", f"Failed to format JSON: {e}")
     
     def _minify_json(self):
         """压缩JSON"""
@@ -302,15 +288,8 @@ class ListEditDialog(SimpleDialog):
     
     def _format_json(self):
         """格式化JSON"""
-        try:
-            current_value = self.value_text.get(1.0, tk.END).strip()
-            formatted = format_json(current_value)
-            self.value_text.delete(1.0, tk.END)
-            self.value_text.insert(1.0, formatted)
-        except ValueError:
+        if not format_json_with_highlighting(self.value_text):
             messagebox.showerror("JSON Error", "Invalid JSON format")
-        except Exception as e:
-            messagebox.showerror("Error", f"Failed to format JSON: {e}")
     
     def _minify_json(self):
         """压缩JSON"""
@@ -418,15 +397,8 @@ class ZSetEditDialog(SimpleDialog):
     
     def _format_json(self):
         """格式化JSON"""
-        try:
-            current_value = self.member_text.get(1.0, tk.END).strip()
-            formatted = format_json(current_value)
-            self.member_text.delete(1.0, tk.END)
-            self.member_text.insert(1.0, formatted)
-        except ValueError:
+        if not format_json_with_highlighting(self.member_text):
             messagebox.showerror("JSON Error", "Invalid JSON format")
-        except Exception as e:
-            messagebox.showerror("Error", f"Failed to format JSON: {e}")
     
     def _minify_json(self):
         """压缩JSON"""
@@ -538,15 +510,8 @@ class AddHashDialog(BaseDialog):
     
     def _format_json(self):
         """格式化JSON"""
-        try:
-            current_value = self.value_text.get(1.0, tk.END).strip()
-            formatted = format_json(current_value)
-            self.value_text.delete(1.0, tk.END)
-            self.value_text.insert(1.0, formatted)
-        except ValueError:
+        if not format_json_with_highlighting(self.value_text):
             messagebox.showerror("JSON Error", "Invalid JSON format")
-        except Exception as e:
-            messagebox.showerror("Error", f"Failed to format JSON: {e}")
     
     def _minify_json(self):
         """压缩JSON"""
@@ -1115,14 +1080,8 @@ class AddNewKeyDialog(SimpleDialog):
     def _format_json(self):
         """格式化JSON"""
         if hasattr(self, 'string_text'):
-            try:
-                from ..utils.helpers import format_json
-                current_value = self.string_text.get(1.0, tk.END).strip()
-                formatted = format_json(current_value)
-                self.string_text.delete(1.0, tk.END)
-                self.string_text.insert(1.0, formatted)
-            except Exception as e:
-                messagebox.showerror("JSON Error", f"Failed to format JSON: {e}")
+            if not format_json_with_highlighting(self.string_text):
+                messagebox.showerror("JSON Error", "Invalid JSON format")
     
     def _minify_json(self):
         """压缩JSON"""
