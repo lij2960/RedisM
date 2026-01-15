@@ -514,6 +514,15 @@ class LeftPanel:
             self.main_window.right_panel.update_status("Redis connection lost and failed to reconnect")
             return
         
+        # 如果指定了目标数据库，先切换到该数据库并更新状态
+        if target_db is not None:
+            try:
+                redis_client.execute_command('SELECT', target_db)
+                self.main_window.redis_conn.set_current_database(target_db)
+            except Exception as e:
+                self.main_window.right_panel.update_status(f"Failed to switch to database {target_db}: {e}")
+                return
+        
         # 立即更新状态，告知用户正在获取最新数据
         self.main_window.right_panel.update_status("🔄 Fetching latest data from Redis...")
         
@@ -544,7 +553,8 @@ class LeftPanel:
                     return
                 
                 redis_ops = RedisOperations(fresh_redis_client)
-                keys, total_keys = redis_ops.get_keys(pattern, max_keys, progress_callback, target_db)
+                # 不再传递target_db参数，因为已经在上面切换好了
+                keys, total_keys = redis_ops.get_keys(pattern, max_keys, progress_callback)
                 
                 self.current_keys = keys
                 self.total_keys_estimate = total_keys
@@ -569,10 +579,15 @@ class LeftPanel:
                             # 恢复数据库选择显示
                             self.main_window.root.after(0, self.restore_database_selection_after_reconnect)
                             
-                            # 重试搜索 - 使用最新的连接
+                            # 如果有目标数据库，重新切换
                             fresh_redis_client = self.main_window.get_redis_client()
+                            if target_db is not None and fresh_redis_client:
+                                fresh_redis_client.execute_command('SELECT', target_db)
+                                self.main_window.redis_conn.set_current_database(target_db)
+                            
+                            # 重试搜索 - 使用最新的连接
                             redis_ops = RedisOperations(fresh_redis_client)
-                            keys, total_keys = redis_ops.get_keys(pattern, max_keys, progress_callback, target_db)
+                            keys, total_keys = redis_ops.get_keys(pattern, max_keys, progress_callback)
                             self.current_keys = keys
                             self.total_keys_estimate = total_keys
                             self.main_window.root.after(0, lambda: self._update_keys_tree(keys))
