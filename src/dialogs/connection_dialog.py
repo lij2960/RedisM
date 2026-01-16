@@ -6,6 +6,8 @@
 import tkinter as tk
 from tkinter import ttk, messagebox, filedialog
 import threading
+import subprocess
+import getpass
 
 from .base_dialog import BaseDialog
 from ..config import *
@@ -91,8 +93,16 @@ class ConnectionDialog(BaseDialog):
         
         ttk.Label(redis_inner, text="Password:", 
                  font=(FONT_FAMILY, FONT_SIZE_NORMAL)).grid(row=3, column=0, sticky='w', pady=(0, 5))
-        self.fields['password'] = ttk.Entry(redis_inner, show="*", font=(FONT_FAMILY, FONT_SIZE_NORMAL))
-        self.fields['password'].grid(row=3, column=1, sticky='ew', padx=(10, 0), pady=(0, 5))
+        password_frame = ttk.Frame(redis_inner)
+        password_frame.grid(row=3, column=1, sticky='ew', padx=(10, 0), pady=(0, 5))
+        
+        self.fields['password'] = ttk.Entry(password_frame, show="*", font=(FONT_FAMILY, FONT_SIZE_NORMAL))
+        self.fields['password'].pack(side=tk.LEFT, fill=tk.X, expand=True)
+        
+        self.show_password_btn = ttk.Button(password_frame, text="👁", width=3, 
+                                           command=self._toggle_password_visibility)
+        self.show_password_btn.pack(side=tk.RIGHT, padx=(5, 0))
+        self.password_visible = False
         
         # 配置选项
         ttk.Label(redis_inner, text="Max Keys (0=unlimited):", 
@@ -332,6 +342,106 @@ class ConnectionDialog(BaseDialog):
         if filename:
             self.fields['ssh_key'].delete(0, tk.END)
             self.fields['ssh_key'].insert(0, filename)
+    
+    def _verify_system_password(self):
+        """验证系统密码"""
+        # 创建密码输入对话框
+        password_dialog = tk.Toplevel(self.dialog)
+        password_dialog.title("System Authentication")
+        password_dialog.geometry("400x150")
+        password_dialog.transient(self.dialog)
+        password_dialog.grab_set()
+        
+        # 居中显示
+        password_dialog.update_idletasks()
+        x = (password_dialog.winfo_screenwidth() // 2) - (400 // 2)
+        y = (password_dialog.winfo_screenheight() // 2) - (150 // 2)
+        password_dialog.geometry(f"400x150+{x}+{y}")
+        
+        # 内容框架
+        content_frame = ttk.Frame(password_dialog, padding=20)
+        content_frame.pack(fill=tk.BOTH, expand=True)
+        
+        # 说明文字
+        ttk.Label(content_frame, text="Enter your system password to view Redis password:", 
+                 font=(FONT_FAMILY, FONT_SIZE_NORMAL)).pack(anchor=tk.W, pady=(0, 10))
+        
+        # 密码输入
+        password_var = tk.StringVar()
+        password_entry = ttk.Entry(content_frame, textvariable=password_var, show="*", 
+                                   font=(FONT_FAMILY, FONT_SIZE_NORMAL))
+        password_entry.pack(fill=tk.X, pady=(0, 15))
+        password_entry.focus_set()
+        
+        # 结果变量
+        result = {'verified': False}
+        
+        def verify():
+            """验证密码"""
+            system_password = password_var.get()
+            if not system_password:
+                messagebox.showerror("Error", "Password cannot be empty", parent=password_dialog)
+                return
+            
+            try:
+                # 使用sudo -S验证密码
+                # 使用一个简单的命令来验证密码
+                process = subprocess.Popen(
+                    ['sudo', '-S', 'true'],
+                    stdin=subprocess.PIPE,
+                    stdout=subprocess.PIPE,
+                    stderr=subprocess.PIPE,
+                    text=True
+                )
+                
+                stdout, stderr = process.communicate(input=system_password + '\n', timeout=5)
+                
+                if process.returncode == 0:
+                    result['verified'] = True
+                    password_dialog.destroy()
+                else:
+                    messagebox.showerror("Authentication Failed", 
+                                       "Incorrect password. Please try again.", 
+                                       parent=password_dialog)
+                    password_entry.delete(0, tk.END)
+                    password_entry.focus_set()
+            except subprocess.TimeoutExpired:
+                messagebox.showerror("Error", "Authentication timeout", parent=password_dialog)
+            except Exception as e:
+                messagebox.showerror("Error", f"Authentication failed: {e}", parent=password_dialog)
+        
+        def cancel():
+            """取消"""
+            password_dialog.destroy()
+        
+        # 按钮
+        btn_frame = ttk.Frame(content_frame)
+        btn_frame.pack(fill=tk.X)
+        
+        ttk.Button(btn_frame, text="Cancel", command=cancel).pack(side=tk.RIGHT)
+        ttk.Button(btn_frame, text="Verify", command=verify).pack(side=tk.RIGHT, padx=(0, 10))
+        
+        # 绑定回车键
+        password_entry.bind('<Return>', lambda e: verify())
+        
+        # 等待对话框关闭
+        password_dialog.wait_window()
+        
+        return result['verified']
+    
+    def _toggle_password_visibility(self):
+        """切换密码可见性"""
+        if not self.password_visible:
+            # 需要验证系统密码才能查看
+            if self._verify_system_password():
+                self.fields['password'].config(show="")
+                self.show_password_btn.config(text="🙈")
+                self.password_visible = True
+        else:
+            # 隐藏密码
+            self.fields['password'].config(show="*")
+            self.show_password_btn.config(text="👁")
+            self.password_visible = False
     
     def _test_connection(self):
         """测试连接"""
