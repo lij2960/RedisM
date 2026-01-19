@@ -97,7 +97,18 @@ tkinter GUI框架
         save_connections(self.connections)
     
     def get_redis_client(self):
-        """获取Redis客户端"""
+        """获取Redis客户端，确保在正确的数据库中"""
+        if not self.redis_conn.redis_client:
+            return None
+        
+        # 确保客户端在正确的数据库中
+        current_db = self.redis_conn.get_current_database()
+        try:
+            # 每次都执行SELECT命令确保在正确的数据库中
+            self.redis_conn.redis_client.execute_command('SELECT', current_db)
+        except Exception as e:
+            print(f"Warning: Failed to select database {current_db}: {e}")
+        
         return self.redis_conn.redis_client
     
     def get_redis_connection(self):

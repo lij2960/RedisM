@@ -579,11 +579,13 @@ class LeftPanel:
                             # 恢复数据库选择显示
                             self.main_window.root.after(0, self.restore_database_selection_after_reconnect)
                             
-                            # 如果有目标数据库，重新切换
+                            # 获取新的Redis客户端（会自动确保在正确的数据库中）
                             fresh_redis_client = self.main_window.get_redis_client()
-                            if target_db is not None and fresh_redis_client:
-                                fresh_redis_client.execute_command('SELECT', target_db)
-                                self.main_window.redis_conn.set_current_database(target_db)
+                            if fresh_redis_client:
+                                if target_db is not None:
+                                    # 如果有目标数据库，切换到目标数据库
+                                    fresh_redis_client.execute_command('SELECT', target_db)
+                                    self.main_window.redis_conn.set_current_database(target_db)
                             
                             # 重试搜索 - 使用最新的连接
                             redis_ops = RedisOperations(fresh_redis_client)

@@ -1252,7 +1252,8 @@ class KeyManager:
                     try:
                         if self.main_window.redis_conn.check_and_reconnect():
                             # 重试删除操作
-                            redis_ops = RedisOperations(self.main_window.get_redis_client())
+                            redis_client = self.main_window.get_redis_client()
+                            redis_ops = RedisOperations(redis_client)
                             redis_ops.delete_key(key)
                             messagebox.showinfo("Success", "Key deleted successfully after reconnection!")
                             
