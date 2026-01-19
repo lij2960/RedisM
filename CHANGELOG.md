@@ -5,6 +5,42 @@ All notable changes to RedisM will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.1.0] - 2025-01-19
+
+### 🔧 Fixed
+- **Database Switching Consistency**: Resolved critical database switching issues
+  - Fixed "Add New Key" operations occasionally switching to default database
+  - Fixed key deletion operations causing database reversion to default
+  - Fixed key list refresh after operations showing wrong database content
+  - Implemented centralized database state management in `get_redis_client()`
+  - Ensured all Redis operations maintain current database selection
+
+- **Auto-Height Dialog Enhancement**: Completed conversion of Add dialogs to auto-height
+  - Converted `AddSetDialog` and `AddZSetDialog` from BaseDialog to SimpleDialog
+  - Implemented true auto-height for value text boxes matching Edit dialogs
+  - Added JSON syntax highlighting to all Add dialogs for consistency
+  - Enhanced user experience with Format JSON and Minify JSON buttons
+
+### 🔐 Enhanced
+- **Connection Security**: Added password visibility toggle with system authentication
+  - Added "View Password" button (👁 icon) next to Redis password field
+  - Implemented system password verification before revealing stored passwords
+  - Enhanced security by requiring macOS system authentication for password access
+  - Improved user experience with secure password management
+
+### 🎨 Improved
+- **JSON Syntax Highlighting**: Comprehensive JSON formatting enhancement
+  - Applied syntax highlighting to all text boxes with Format JSON functionality
+  - Implemented color-coded JSON display (strings, keys, numbers, booleans, null values)
+  - Enhanced readability with consistent color scheme across all dialogs
+  - Real-time syntax highlighting during JSON editing
+
+- **Filter and Statistics Enhancement**: Improved structured data display
+  - Modified filter text boxes to fixed width (25 characters) for better layout
+  - Added total count display showing "Total: X fields/items/members"
+  - Fixed initial count display issues by proper data initialization order
+  - Enhanced user experience with immediate and accurate statistics
+
 ## [1.0.5] - 2025-01-05
 
 ### 🔧 Fixed
