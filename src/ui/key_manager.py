@@ -340,58 +340,90 @@ class KeyManager:
     
     def load_key_details(self, key):
         """加载键详情"""
-        redis_client = self.main_window.get_redis_client()
-        if not redis_client:
-            messagebox.showerror("Error", "No Redis connection available")
-            return
-        
         def load_thread():
             try:
-                # 检查连接状态，如果断开则尝试重连
-                if not self.main_window.redis_conn.check_and_reconnect():
-                    self.main_window.root.after(0, lambda: messagebox.showerror("Connection Error", 
-                        "Redis connection lost and failed to reconnect. Please check your connection."))
+                # 先尝试快速检查连接
+                redis_client = self.main_window.get_redis_client()
+                if not redis_client:
+                    self.main_window.root.after(0, lambda: messagebox.showerror("Error", "No Redis connection available"))
                     return
                 
-                # 更新状态显示重连成功（如果发生了重连）
+                # 快速ping测试，设置短超时
+                redis_client.ping()
+                # 连接正常，直接加载
+                self._continue_load_key_details(key)
+                
+            except Exception as e:
+                # 连接有问题，异步重连
+                self.main_window.root.after(0, lambda: self.main_window.right_panel.update_status("🔄 Connection lost, attempting to reconnect..."))
+                
+                def on_reconnect_success(result):
+                    if result:
+                        # 重连成功，继续加载
+                        self.main_window.root.after(0, lambda: self.main_window.right_panel.update_status("🔄 Reconnected, loading key..."))
+                        self._continue_load_key_details(key)
+                    else:
+                        # 重连失败
+                        self.main_window.root.after(0, lambda: messagebox.showerror("Connection Error", 
+                            "Redis connection lost and failed to reconnect. Please check your connection."))
+                        self.main_window.root.after(0, lambda: self.main_window.right_panel.update_status("❌ Connection failed"))
+                
+                def on_reconnect_error(error):
+                    self.main_window.root.after(0, lambda: messagebox.showerror("Connection Error", 
+                        f"Failed to reconnect: {error}"))
+                    self.main_window.root.after(0, lambda: self.main_window.right_panel.update_status("❌ Reconnection failed"))
+                
+                self.main_window.redis_conn.check_and_reconnect_async(on_reconnect_success, on_reconnect_error)
+        
+        # 在后台线程中执行连接检查
+        threading.Thread(target=load_thread, daemon=True).start()
+    
+    def _continue_load_key_details(self, key):
+        """继续加载键详情（在连接确认后）"""
+        def load_thread():
+            try:
                 self.main_window.root.after(0, lambda: self.main_window.right_panel.update_status(f"Loading key '{key}'..."))
                 
+                redis_client = self.main_window.get_redis_client()
                 redis_ops = RedisOperations(redis_client)
                 
                 # 获取键信息
                 key_info = redis_ops.get_key_info(key)
                 if not key_info:
                     self.main_window.root.after(0, lambda: messagebox.showerror("Error", f"Key '{key}' does not exist"))
+                    self.main_window.root.after(0, lambda: self.main_window.right_panel.update_status("❌ Key not found"))
                     return
                 
                 # 获取值
                 value = redis_ops.get_key_value(key, key_info['type'])
                 
                 self.main_window.root.after(0, lambda: self._show_key_details(key, key_info, value))
-                self.main_window.root.after(0, lambda: self.main_window.right_panel.update_status(f"Loaded key '{key}'"))
+                self.main_window.root.after(0, lambda: self.main_window.right_panel.update_status(f"✅ Loaded key '{key}'"))
                 
             except Exception as e:
                 error_msg = f"Failed to load key '{key}': {str(e)}"
                 # 检查是否是连接相关的错误
                 if "connection" in str(e).lower() or "timeout" in str(e).lower():
-                    # 尝试重连
-                    try:
-                        if self.main_window.redis_conn.check_and_reconnect():
-                            self.main_window.root.after(0, lambda: self.main_window.right_panel.update_status("Reconnected, retrying..."))
+                    # 连接错误，再次尝试异步重连
+                    def retry_on_success(result):
+                        if result:
+                            self.main_window.root.after(0, lambda: self.main_window.right_panel.update_status("🔄 Reconnected, retrying..."))
                             # 重试加载
-                            redis_ops = RedisOperations(self.main_window.get_redis_client())
-                            key_info = redis_ops.get_key_info(key)
-                            if key_info:
-                                value = redis_ops.get_key_value(key, key_info['type'])
-                                self.main_window.root.after(0, lambda: self._show_key_details(key, key_info, value))
-                                self.main_window.root.after(0, lambda: self.main_window.right_panel.update_status(f"Loaded key '{key}' after reconnection"))
-                                return
-                    except Exception as retry_e:
-                        error_msg = f"Failed to load key '{key}' after reconnection: {str(retry_e)}"
-                
-                self.main_window.root.after(0, lambda msg=error_msg: messagebox.showerror("Error", msg))
-                self.main_window.root.after(0, lambda: self.main_window.right_panel.update_status("Failed to load key"))
+                            self._continue_load_key_details(key)
+                        else:
+                            self.main_window.root.after(0, lambda: messagebox.showerror("Error", "Failed to reconnect and load key"))
+                            self.main_window.root.after(0, lambda: self.main_window.right_panel.update_status("❌ Failed to load key"))
+                    
+                    def retry_on_error(error):
+                        self.main_window.root.after(0, lambda: messagebox.showerror("Error", f"Reconnection failed: {error}"))
+                        self.main_window.root.after(0, lambda: self.main_window.right_panel.update_status("❌ Reconnection failed"))
+                    
+                    self.main_window.redis_conn.check_and_reconnect_async(retry_on_success, retry_on_error)
+                else:
+                    self.main_window.root.after(0, lambda: messagebox.showerror("Error", error_msg))
+                    self.main_window.root.after(0, lambda: self.main_window.right_panel.update_status("❌ Failed to load key"))
         
+        # 在后台线程中执行实际的加载操作
         threading.Thread(target=load_thread, daemon=True).start()
     
     def _show_key_details(self, key, key_info, value):
@@ -1224,50 +1256,72 @@ class KeyManager:
     def _delete_key(self, key):
         """删除键"""
         if messagebox.askyesno("Delete Key", f"Are you sure you want to delete '{key}'?"):
+            def delete_thread():
+                try:
+                    redis_client = self.main_window.get_redis_client()
+                    if not redis_client:
+                        self.main_window.root.after(0, lambda: messagebox.showerror("Error", "No Redis connection available"))
+                        return
+                    
+                    # 快速ping测试
+                    redis_client.ping()
+                    # 连接正常，执行删除
+                    self._continue_delete_key(key)
+                    
+                except Exception as e:
+                    # 连接有问题，异步重连
+                    def on_reconnect_success(result):
+                        if result:
+                            # 重连成功，继续删除
+                            self._continue_delete_key(key)
+                        else:
+                            # 重连失败
+                            self.main_window.root.after(0, lambda: messagebox.showerror("Connection Error", "Redis connection lost and failed to reconnect"))
+                    
+                    def on_reconnect_error(error):
+                        self.main_window.root.after(0, lambda: messagebox.showerror("Connection Error", f"Failed to reconnect: {error}"))
+                    
+                    self.main_window.redis_conn.check_and_reconnect_async(on_reconnect_success, on_reconnect_error)
+            
+            # 在后台线程中执行连接检查
+            threading.Thread(target=delete_thread, daemon=True).start()
+    
+    def _continue_delete_key(self, key):
+        """继续删除键（在连接确认后）"""
+        def delete_thread():
             try:
                 redis_client = self.main_window.get_redis_client()
-                if not redis_client:
-                    messagebox.showerror("Error", "No Redis connection available")
-                    return
-                
-                # 检查连接状态，如果断开则尝试重连
-                if not self.main_window.redis_conn.check_and_reconnect():
-                    messagebox.showerror("Connection Error", "Redis connection lost and failed to reconnect")
-                    return
-                
                 redis_ops = RedisOperations(redis_client)
                 redis_ops.delete_key(key)
                 
-                messagebox.showinfo("Success", "Key deleted successfully!")
+                self.main_window.root.after(0, lambda: messagebox.showinfo("Success", "Key deleted successfully!"))
                 
                 # 刷新键列表
                 self.main_window.left_panel.search_keys()
                 
                 # 清空详情
-                self.clear_details()
+                self.main_window.root.after(0, self.clear_details)
                 
             except Exception as e:
-                # 检查是否是连接相关的错误，如果是则尝试重连
+                # 检查是否是连接相关的错误
                 if "connection" in str(e).lower() or "timeout" in str(e).lower():
-                    try:
-                        if self.main_window.redis_conn.check_and_reconnect():
+                    # 连接错误，再次尝试异步重连
+                    def retry_on_success(result):
+                        if result:
                             # 重试删除操作
-                            redis_client = self.main_window.get_redis_client()
-                            redis_ops = RedisOperations(redis_client)
-                            redis_ops.delete_key(key)
-                            messagebox.showinfo("Success", "Key deleted successfully after reconnection!")
-                            
-                            # 刷新键列表
-                            self.main_window.left_panel.search_keys()
-                            
-                            # 清空详情
-                            self.clear_details()
-                            return
-                    except Exception as retry_e:
-                        messagebox.showerror("Error", f"Failed to delete key after reconnection: {retry_e}")
-                        return
-                
-                messagebox.showerror("Error", f"Failed to delete key: {e}")
+                            self._continue_delete_key(key)
+                        else:
+                            self.main_window.root.after(0, lambda: messagebox.showerror("Error", "Failed to reconnect and delete key"))
+                    
+                    def retry_on_error(error):
+                        self.main_window.root.after(0, lambda: messagebox.showerror("Error", f"Reconnection failed: {error}"))
+                    
+                    self.main_window.redis_conn.check_and_reconnect_async(retry_on_success, retry_on_error)
+                else:
+                    self.main_window.root.after(0, lambda: messagebox.showerror("Error", f"Failed to delete key: {e}"))
+        
+        # 在后台线程中执行删除操作
+        threading.Thread(target=delete_thread, daemon=True).start()
     
     def _add_new_key(self):
         """添加新键"""

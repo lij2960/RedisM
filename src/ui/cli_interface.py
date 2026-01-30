@@ -102,10 +102,40 @@ class CLIInterface:
         
         def execute_thread():
             try:
-                # 检查连接状态
-                if not self.main_window.redis_conn.check_and_reconnect():
-                    self.main_window.root.after(0, lambda: self._append_output("Error: Connection lost and reconnection failed"))
+                # 先尝试快速检查连接
+                redis_client = self.main_window.get_redis_client()
+                if not redis_client:
+                    self.main_window.root.after(0, lambda: self._append_output("Error: No Redis connection available"))
                     return
+                
+                # 快速ping测试
+                redis_client.ping()
+                # 连接正常，执行命令
+                self._continue_execute_command(command)
+                
+            except Exception as e:
+                # 连接有问题，异步重连
+                def on_reconnect_success(result):
+                    if result:
+                        # 重连成功，继续执行命令
+                        self._continue_execute_command(command)
+                    else:
+                        # 重连失败
+                        self.main_window.root.after(0, lambda: self._append_output("Error: Connection lost and reconnection failed"))
+                
+                def on_reconnect_error(error):
+                    self.main_window.root.after(0, lambda: self._append_output(f"Error: Reconnection failed: {error}"))
+                
+                self.main_window.root.after(0, lambda: self._append_output("Connection lost, attempting to reconnect..."))
+                self.main_window.redis_conn.check_and_reconnect_async(on_reconnect_success, on_reconnect_error)
+        
+        threading.Thread(target=execute_thread, daemon=True).start()
+    
+    def _continue_execute_command(self, command):
+        """继续执行命令（在连接确认后）"""
+        def execute_thread():
+            try:
+                redis_client = self.main_window.get_redis_client()
                 
                 # 解析命令
                 parts = command.split()

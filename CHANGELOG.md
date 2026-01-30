@@ -5,6 +5,24 @@ All notable changes to RedisM will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.1.1] - 2025-01-19
+
+### 🔧 Fixed
+- **Critical Connection Stability**: Resolved application freeze/crash when Redis disconnects
+  - Replaced synchronous `check_and_reconnect()` calls with asynchronous `check_and_reconnect_async()`
+  - Added connection timeout settings (5s socket timeout, 5s connect timeout) to prevent long blocks
+  - Implemented non-blocking reconnection for all critical operations (key loading, searching, deletion)
+  - Fixed UI thread blocking that caused application to become unresponsive during connection issues
+  - Enhanced error handling with proper thread management for connection recovery
+
+### 🚀 Enhanced
+- **Robust Error Recovery**: Improved connection resilience across all operations
+  - Key details loading now handles disconnections gracefully without freezing
+  - Key search operations continue seamlessly after reconnection
+  - Delete operations recover automatically from connection issues
+  - CLI commands execute reliably with automatic reconnection
+  - All operations provide clear status feedback during reconnection process
+
 ## [1.1.0] - 2025-01-19
 
 ### 🔧 Fixed

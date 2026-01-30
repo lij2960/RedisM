@@ -53,7 +53,11 @@ class RedisConnection:
             password=conn_config.get('password') or None,
             username=conn_config.get('username') or None,
             db=0,
-            decode_responses=True
+            decode_responses=True,
+            socket_timeout=5,  # 5秒超时
+            socket_connect_timeout=5,  # 连接超时
+            retry_on_timeout=True,
+            health_check_interval=30  # 健康检查间隔
         )
         
         # 测试连接
@@ -111,7 +115,7 @@ class RedisConnection:
             if not self.redis_client:
                 return False
             
-            # 尝试ping测试连接
+            # 尝试ping测试连接，设置短超时避免阻塞
             self.redis_client.ping()
             return True
             
@@ -139,6 +143,22 @@ class RedisConnection:
                     print(f"Reconnection failed: {reconnect_error}")
                     return False
             return False
+    
+    def check_and_reconnect_async(self, success_callback=None, error_callback=None):
+        """异步检查连接状态并重连，避免阻塞UI"""
+        import threading
+        
+        def reconnect_thread():
+            try:
+                result = self.check_and_reconnect()
+                if success_callback:
+                    success_callback(result)
+            except Exception as e:
+                if error_callback:
+                    error_callback(str(e))
+        
+        # 在后台线程中执行重连
+        threading.Thread(target=reconnect_thread, daemon=True).start()
     
     def test_connection(self, conn_config):
         """测试连接配置"""

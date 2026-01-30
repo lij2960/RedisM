@@ -504,19 +504,46 @@ class LeftPanel:
     # 键搜索和显示方法
     def search_keys(self, target_db=None):
         """搜索键 - 实时从Redis获取最新数据"""
-        redis_client = self.main_window.get_redis_client()
-        if not redis_client:
-            self.main_window.right_panel.update_status("No Redis connection available")
-            return
+        # 先尝试快速检查连接
+        def check_connection_and_search():
+            try:
+                redis_client = self.main_window.get_redis_client()
+                if not redis_client:
+                    self.main_window.right_panel.update_status("No Redis connection available")
+                    return
+                
+                # 快速ping测试
+                redis_client.ping()
+                # 连接正常，继续搜索
+                self._continue_search_keys(target_db)
+                
+            except Exception as e:
+                # 连接有问题，异步重连
+                self.main_window.right_panel.update_status("🔄 Connection lost, attempting to reconnect...")
+                
+                def on_reconnect_success(result):
+                    if result:
+                        # 重连成功，继续搜索
+                        self.main_window.root.after(0, lambda: self.main_window.right_panel.update_status("🔄 Reconnected, searching keys..."))
+                        self._continue_search_keys(target_db)
+                    else:
+                        # 重连失败
+                        self.main_window.root.after(0, lambda: self.main_window.right_panel.update_status("❌ Redis connection lost and failed to reconnect"))
+                
+                def on_reconnect_error(error):
+                    self.main_window.root.after(0, lambda: self.main_window.right_panel.update_status(f"❌ Reconnection failed: {error}"))
+                
+                self.main_window.redis_conn.check_and_reconnect_async(on_reconnect_success, on_reconnect_error)
         
-        # 检查连接状态，如果断开则尝试重连
-        if not self.main_window.redis_conn.check_and_reconnect():
-            self.main_window.right_panel.update_status("Redis connection lost and failed to reconnect")
-            return
-        
+        # 在后台线程中执行连接检查
+        threading.Thread(target=check_connection_and_search, daemon=True).start()
+    
+    def _continue_search_keys(self, target_db=None):
+        """继续搜索键（在连接确认后）"""
         # 如果指定了目标数据库，先切换到该数据库并更新状态
         if target_db is not None:
             try:
+                redis_client = self.main_window.get_redis_client()
                 redis_client.execute_command('SELECT', target_db)
                 self.main_window.redis_conn.set_current_database(target_db)
             except Exception as e:
@@ -571,38 +598,45 @@ class LeftPanel:
                 error_msg = str(e)
                 # 检查是否是连接相关的错误
                 if "connection" in error_msg.lower() or "timeout" in error_msg.lower():
-                    try:
-                        # 尝试重连
-                        if self.main_window.redis_conn.check_and_reconnect():
+                    # 连接错误，使用异步重连
+                    def retry_on_success(result):
+                        if result:
                             self.main_window.root.after(0, lambda: self.main_window.right_panel.update_status("🔄 Reconnected, retrying key search..."))
                             
                             # 恢复数据库选择显示
                             self.main_window.root.after(0, self.restore_database_selection_after_reconnect)
                             
-                            # 获取新的Redis客户端（会自动确保在正确的数据库中）
-                            fresh_redis_client = self.main_window.get_redis_client()
-                            if fresh_redis_client:
-                                if target_db is not None:
-                                    # 如果有目标数据库，切换到目标数据库
-                                    fresh_redis_client.execute_command('SELECT', target_db)
-                                    self.main_window.redis_conn.set_current_database(target_db)
+                            # 重试搜索
+                            def retry_search():
+                                try:
+                                    fresh_redis_client = self.main_window.get_redis_client()
+                                    if fresh_redis_client:
+                                        if target_db is not None:
+                                            fresh_redis_client.execute_command('SELECT', target_db)
+                                            self.main_window.redis_conn.set_current_database(target_db)
+                                    
+                                    redis_ops = RedisOperations(fresh_redis_client)
+                                    keys, total_keys = redis_ops.get_keys(pattern, max_keys, progress_callback)
+                                    self.current_keys = keys
+                                    self.total_keys_estimate = total_keys
+                                    self.main_window.root.after(0, lambda: self._update_keys_tree(keys))
+                                    
+                                    key_count = len(keys) if keys else 0
+                                    current_db = self.main_window.redis_conn.get_current_database()
+                                    self.main_window.root.after(0, lambda: self.main_window.right_panel.update_status(f"✅ Keys loaded after reconnection ({key_count} found in DB {current_db})"))
+                                except Exception as retry_e:
+                                    self.main_window.root.after(0, lambda: self.main_window.right_panel.update_status(f"❌ Failed to search keys after reconnection: {str(retry_e)}"))
                             
-                            # 重试搜索 - 使用最新的连接
-                            redis_ops = RedisOperations(fresh_redis_client)
-                            keys, total_keys = redis_ops.get_keys(pattern, max_keys, progress_callback)
-                            self.current_keys = keys
-                            self.total_keys_estimate = total_keys
-                            self.main_window.root.after(0, lambda: self._update_keys_tree(keys))
-                            
-                            key_count = len(keys) if keys else 0
-                            current_db = self.main_window.redis_conn.get_current_database()
-                            self.main_window.root.after(0, lambda: self.main_window.right_panel.update_status(f"✅ Keys loaded after reconnection ({key_count} found in DB {current_db})"))
-                            return
-                    except Exception as retry_e:
-                        error_msg = f"Failed to search keys after reconnection: {str(retry_e)}"
-                
-                self.main_window.root.after(0, lambda msg=error_msg: 
-                    self.main_window.right_panel.update_status(f"❌ Failed to get keys: {msg}"))
+                            threading.Thread(target=retry_search, daemon=True).start()
+                        else:
+                            self.main_window.root.after(0, lambda: self.main_window.right_panel.update_status("❌ Failed to reconnect for key search"))
+                    
+                    def retry_on_error(error):
+                        self.main_window.root.after(0, lambda: self.main_window.right_panel.update_status(f"❌ Reconnection failed: {error}"))
+                    
+                    self.main_window.redis_conn.check_and_reconnect_async(retry_on_success, retry_on_error)
+                else:
+                    self.main_window.root.after(0, lambda: self.main_window.right_panel.update_status(f"❌ Failed to get keys: {error_msg}"))
         
         threading.Thread(target=search_thread, daemon=True).start()
     
