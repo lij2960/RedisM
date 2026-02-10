@@ -698,11 +698,11 @@ class KeyManager:
     def _show_text_value(self, parent, key, key_type, value):
         """显示文本数据 - 使用固定高度防止按钮被挤压"""
         # 重新配置父容器的grid权重 - 确保只有文本区域可扩展
-        parent.grid_rowconfigure(0, weight=0)  # JSON格式化按钮区域固定高度
+        parent.grid_rowconfigure(0, weight=0)  # 格式化按钮区域固定高度
         parent.grid_rowconfigure(1, weight=1)  # 文本区域可扩展
         parent.grid_columnconfigure(0, weight=1)
         
-        # 固定区域：JSON格式化按钮 (第0行) - 设置固定高度防止被挤压
+        # 固定区域：格式化按钮 (第0行) - 设置固定高度防止被挤压
         format_frame = ttk.Frame(parent, height=40)  # 设置固定高度40像素
         format_frame.grid(row=0, column=0, sticky="ew", padx=5, pady=5)
         format_frame.pack_propagate(False)  # 防止子组件改变父容器大小
@@ -710,7 +710,11 @@ class KeyManager:
         ttk.Button(format_frame, text="Format JSON", 
                   command=lambda: self._format_json_value()).pack(side=tk.LEFT, padx=(0, 5))
         ttk.Button(format_frame, text="Minify JSON", 
-                  command=lambda: self._minify_json_value()).pack(side=tk.LEFT)
+                  command=lambda: self._minify_json_value()).pack(side=tk.LEFT, padx=(0, 10))
+        ttk.Button(format_frame, text="Format PHP", 
+                  command=lambda: self._format_php_value()).pack(side=tk.LEFT, padx=(0, 5))
+        ttk.Button(format_frame, text="Minify PHP", 
+                  command=lambda: self._minify_php_value()).pack(side=tk.LEFT)
         
         # 可扩展区域：文本编辑器 (第1行，可扩展)
         text_container = ttk.Frame(parent)
@@ -1375,6 +1379,34 @@ class KeyManager:
             messagebox.showerror("JSON Error", str(e))
         except Exception as e:
             messagebox.showerror("Error", f"Failed to minify JSON: {e}")
+    
+    def _format_php_value(self):
+        """格式化PHP序列化值"""
+        try:
+            from ..utils.helpers import format_php_serialize
+            current_value = self.value_text.get(1.0, tk.END).strip()
+            formatted = format_php_serialize(current_value)
+            self.value_text.delete(1.0, tk.END)
+            self.value_text.insert(1.0, formatted)
+            # 格式化后的是JSON，应用JSON语法高亮
+            apply_json_syntax_highlighting(self.value_text)
+        except ValueError as e:
+            messagebox.showerror("PHP Serialize Error", str(e))
+        except Exception as e:
+            messagebox.showerror("Error", f"Failed to format PHP serialize: {e}")
+    
+    def _minify_php_value(self):
+        """压缩PHP序列化值"""
+        try:
+            from ..utils.helpers import minify_php_serialize
+            current_value = self.value_text.get(1.0, tk.END).strip()
+            minified = minify_php_serialize(current_value)
+            self.value_text.delete(1.0, tk.END)
+            self.value_text.insert(1.0, minified)
+        except ValueError as e:
+            messagebox.showerror("PHP Serialize Error", str(e))
+        except Exception as e:
+            messagebox.showerror("Error", f"Failed to minify PHP serialize: {e}")
     
     def _show_search_dialog(self):
         """显示搜索对话框"""

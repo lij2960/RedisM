@@ -9,7 +9,9 @@ from tkinter import ttk, messagebox
 from .base_dialog import BaseDialog
 from .simple_dialog import SimpleDialog
 from ..config import *
-from ..utils.helpers import format_json, minify_json, apply_json_syntax_highlighting, setup_json_text_widget, format_json_with_highlighting
+from ..utils.helpers import (format_json, minify_json, apply_json_syntax_highlighting, 
+                             setup_json_text_widget, format_json_with_highlighting,
+                             format_php_serialize, minify_php_serialize)
 from ..redis.operations import RedisOperations
 
 
@@ -44,14 +46,18 @@ class HashEditDialog(SimpleDialog):
         value_frame.grid_rowconfigure(1, weight=1)  # 文本区域可扩展
         value_frame.grid_columnconfigure(0, weight=1)
         
-        # JSON格式化按钮 - 固定高度
-        json_btn_frame = ttk.Frame(value_frame)
-        json_btn_frame.grid(row=0, column=0, sticky="ew", padx=5, pady=5)
+        # 格式化按钮 - 固定高度
+        format_btn_frame = ttk.Frame(value_frame)
+        format_btn_frame.grid(row=0, column=0, sticky="ew", padx=5, pady=5)
         
-        ttk.Button(json_btn_frame, text="Format JSON", 
+        ttk.Button(format_btn_frame, text="Format JSON", 
                   command=self._format_json).pack(side=tk.LEFT, padx=(0, 5))
-        ttk.Button(json_btn_frame, text="Minify JSON", 
-                  command=self._minify_json).pack(side=tk.LEFT)
+        ttk.Button(format_btn_frame, text="Minify JSON", 
+                  command=self._minify_json).pack(side=tk.LEFT, padx=(0, 10))
+        ttk.Button(format_btn_frame, text="Format PHP", 
+                  command=self._format_php).pack(side=tk.LEFT, padx=(0, 5))
+        ttk.Button(format_btn_frame, text="Minify PHP", 
+                  command=self._minify_php).pack(side=tk.LEFT)
         
         # 文本编辑器 - 自适应高度
         text_container = ttk.Frame(value_frame)
@@ -151,14 +157,18 @@ class SetEditDialog(SimpleDialog):
         value_frame.grid_rowconfigure(1, weight=1)  # 文本区域可扩展
         value_frame.grid_columnconfigure(0, weight=1)
         
-        # JSON格式化按钮 - 固定高度
-        json_btn_frame = ttk.Frame(value_frame)
-        json_btn_frame.grid(row=0, column=0, sticky="ew", padx=5, pady=5)
+        # 格式化按钮 - 固定高度
+        format_btn_frame = ttk.Frame(value_frame)
+        format_btn_frame.grid(row=0, column=0, sticky="ew", padx=5, pady=5)
         
-        ttk.Button(json_btn_frame, text="Format JSON", 
+        ttk.Button(format_btn_frame, text="Format JSON", 
                   command=self._format_json).pack(side=tk.LEFT, padx=(0, 5))
-        ttk.Button(json_btn_frame, text="Minify JSON", 
-                  command=self._minify_json).pack(side=tk.LEFT)
+        ttk.Button(format_btn_frame, text="Minify JSON", 
+                  command=self._minify_json).pack(side=tk.LEFT, padx=(0, 10))
+        ttk.Button(format_btn_frame, text="Format PHP", 
+                  command=self._format_php).pack(side=tk.LEFT, padx=(0, 5))
+        ttk.Button(format_btn_frame, text="Minify PHP", 
+                  command=self._minify_php).pack(side=tk.LEFT)
         
         # 文本编辑器 - 自适应高度
         text_container = ttk.Frame(value_frame)
@@ -257,14 +267,18 @@ class ListEditDialog(SimpleDialog):
         value_frame.grid_rowconfigure(1, weight=1)  # 文本区域可扩展
         value_frame.grid_columnconfigure(0, weight=1)
         
-        # JSON格式化按钮 - 固定高度
-        json_btn_frame = ttk.Frame(value_frame)
-        json_btn_frame.grid(row=0, column=0, sticky="ew", padx=5, pady=5)
+        # 格式化按钮 - 固定高度
+        format_btn_frame = ttk.Frame(value_frame)
+        format_btn_frame.grid(row=0, column=0, sticky="ew", padx=5, pady=5)
         
-        ttk.Button(json_btn_frame, text="Format JSON", 
+        ttk.Button(format_btn_frame, text="Format JSON", 
                   command=self._format_json).pack(side=tk.LEFT, padx=(0, 5))
-        ttk.Button(json_btn_frame, text="Minify JSON", 
-                  command=self._minify_json).pack(side=tk.LEFT)
+        ttk.Button(format_btn_frame, text="Minify JSON", 
+                  command=self._minify_json).pack(side=tk.LEFT, padx=(0, 10))
+        ttk.Button(format_btn_frame, text="Format PHP", 
+                  command=self._format_php).pack(side=tk.LEFT, padx=(0, 5))
+        ttk.Button(format_btn_frame, text="Minify PHP", 
+                  command=self._minify_php).pack(side=tk.LEFT)
         
         # 文本编辑器 - 自适应高度
         text_container = ttk.Frame(value_frame)
@@ -365,14 +379,18 @@ class ZSetEditDialog(SimpleDialog):
         member_frame.grid_rowconfigure(1, weight=1)  # 文本区域可扩展
         member_frame.grid_columnconfigure(0, weight=1)
         
-        # JSON格式化按钮 - 固定高度
-        json_btn_frame = ttk.Frame(member_frame)
-        json_btn_frame.grid(row=0, column=0, sticky="ew", padx=5, pady=5)
+        # 格式化按钮 - 固定高度
+        format_btn_frame = ttk.Frame(member_frame)
+        format_btn_frame.grid(row=0, column=0, sticky="ew", padx=5, pady=5)
         
-        ttk.Button(json_btn_frame, text="Format JSON", 
+        ttk.Button(format_btn_frame, text="Format JSON", 
                   command=self._format_json).pack(side=tk.LEFT, padx=(0, 5))
-        ttk.Button(json_btn_frame, text="Minify JSON", 
-                  command=self._minify_json).pack(side=tk.LEFT)
+        ttk.Button(format_btn_frame, text="Minify JSON", 
+                  command=self._minify_json).pack(side=tk.LEFT, padx=(0, 10))
+        ttk.Button(format_btn_frame, text="Format PHP", 
+                  command=self._format_php).pack(side=tk.LEFT, padx=(0, 5))
+        ttk.Button(format_btn_frame, text="Minify PHP", 
+                  command=self._minify_php).pack(side=tk.LEFT)
         
         # 文本编辑器 - 自适应高度
         text_container = ttk.Frame(member_frame)
@@ -476,14 +494,18 @@ class AddHashDialog(SimpleDialog):
         value_frame.grid_rowconfigure(1, weight=1)  # 文本区域可扩展
         value_frame.grid_columnconfigure(0, weight=1)
         
-        # JSON格式化按钮 - 固定高度
-        json_btn_frame = ttk.Frame(value_frame)
-        json_btn_frame.grid(row=0, column=0, sticky="ew", padx=5, pady=5)
+        # 格式化按钮 - 固定高度
+        format_btn_frame = ttk.Frame(value_frame)
+        format_btn_frame.grid(row=0, column=0, sticky="ew", padx=5, pady=5)
         
-        ttk.Button(json_btn_frame, text="Format JSON", 
+        ttk.Button(format_btn_frame, text="Format JSON", 
                   command=self._format_json).pack(side=tk.LEFT, padx=(0, 5))
-        ttk.Button(json_btn_frame, text="Minify JSON", 
-                  command=self._minify_json).pack(side=tk.LEFT)
+        ttk.Button(format_btn_frame, text="Minify JSON", 
+                  command=self._minify_json).pack(side=tk.LEFT, padx=(0, 10))
+        ttk.Button(format_btn_frame, text="Format PHP", 
+                  command=self._format_php).pack(side=tk.LEFT, padx=(0, 5))
+        ttk.Button(format_btn_frame, text="Minify PHP", 
+                  command=self._minify_php).pack(side=tk.LEFT)
         
         # 文本编辑器 - 自适应高度
         text_container = ttk.Frame(value_frame)
@@ -683,14 +705,18 @@ class AddSetDialog(SimpleDialog):
         value_frame.grid_rowconfigure(1, weight=1)  # 文本区域可扩展
         value_frame.grid_columnconfigure(0, weight=1)
         
-        # JSON格式化按钮 - 固定高度
-        json_btn_frame = ttk.Frame(value_frame)
-        json_btn_frame.grid(row=0, column=0, sticky="ew", padx=5, pady=5)
+        # 格式化按钮 - 固定高度
+        format_btn_frame = ttk.Frame(value_frame)
+        format_btn_frame.grid(row=0, column=0, sticky="ew", padx=5, pady=5)
         
-        ttk.Button(json_btn_frame, text="Format JSON", 
+        ttk.Button(format_btn_frame, text="Format JSON", 
                   command=self._format_json).pack(side=tk.LEFT, padx=(0, 5))
-        ttk.Button(json_btn_frame, text="Minify JSON", 
-                  command=self._minify_json).pack(side=tk.LEFT)
+        ttk.Button(format_btn_frame, text="Minify JSON", 
+                  command=self._minify_json).pack(side=tk.LEFT, padx=(0, 10))
+        ttk.Button(format_btn_frame, text="Format PHP", 
+                  command=self._format_php).pack(side=tk.LEFT, padx=(0, 5))
+        ttk.Button(format_btn_frame, text="Minify PHP", 
+                  command=self._minify_php).pack(side=tk.LEFT)
         
         # 文本编辑器 - 自适应高度
         text_container = ttk.Frame(value_frame)
@@ -809,14 +835,18 @@ class AddZSetDialog(SimpleDialog):
         member_frame.grid_rowconfigure(1, weight=1)  # 文本区域可扩展
         member_frame.grid_columnconfigure(0, weight=1)
         
-        # JSON格式化按钮 - 固定高度
-        json_btn_frame = ttk.Frame(member_frame)
-        json_btn_frame.grid(row=0, column=0, sticky="ew", padx=5, pady=5)
+        # 格式化按钮 - 固定高度
+        format_btn_frame = ttk.Frame(member_frame)
+        format_btn_frame.grid(row=0, column=0, sticky="ew", padx=5, pady=5)
         
-        ttk.Button(json_btn_frame, text="Format JSON", 
+        ttk.Button(format_btn_frame, text="Format JSON", 
                   command=self._format_json).pack(side=tk.LEFT, padx=(0, 5))
-        ttk.Button(json_btn_frame, text="Minify JSON", 
-                  command=self._minify_json).pack(side=tk.LEFT)
+        ttk.Button(format_btn_frame, text="Minify JSON", 
+                  command=self._minify_json).pack(side=tk.LEFT, padx=(0, 10))
+        ttk.Button(format_btn_frame, text="Format PHP", 
+                  command=self._format_php).pack(side=tk.LEFT, padx=(0, 5))
+        ttk.Button(format_btn_frame, text="Minify PHP", 
+                  command=self._minify_php).pack(side=tk.LEFT)
         
         # 文本编辑器 - 自适应高度
         text_container = ttk.Frame(member_frame)
@@ -1019,14 +1049,18 @@ class AddNewKeyDialog(SimpleDialog):
         self.value_frame.grid_rowconfigure(1, weight=1)  # 文本区域可扩展
         self.value_frame.grid_columnconfigure(0, weight=1)
         
-        # JSON格式化按钮
-        json_btn_frame = ttk.Frame(self.value_frame)
-        json_btn_frame.grid(row=0, column=0, sticky="ew", padx=5, pady=5)
+        # 格式化按钮
+        format_btn_frame = ttk.Frame(self.value_frame)
+        format_btn_frame.grid(row=0, column=0, sticky="ew", padx=5, pady=5)
         
-        ttk.Button(json_btn_frame, text="Format JSON", 
+        ttk.Button(format_btn_frame, text="Format JSON", 
                   command=self._format_json).pack(side=tk.LEFT, padx=(0, 5))
-        ttk.Button(json_btn_frame, text="Minify JSON", 
-                  command=self._minify_json).pack(side=tk.LEFT)
+        ttk.Button(format_btn_frame, text="Minify JSON", 
+                  command=self._minify_json).pack(side=tk.LEFT, padx=(0, 10))
+        ttk.Button(format_btn_frame, text="Format PHP", 
+                  command=self._format_php).pack(side=tk.LEFT, padx=(0, 5))
+        ttk.Button(format_btn_frame, text="Minify PHP", 
+                  command=self._minify_php).pack(side=tk.LEFT)
         
         # 文本输入 - 使用自适应高度
         text_container = ttk.Frame(self.value_frame)
@@ -1178,6 +1212,36 @@ class AddNewKeyDialog(SimpleDialog):
                 self.string_text.insert(1.0, minified)
             except Exception as e:
                 messagebox.showerror("JSON Error", f"Failed to minify JSON: {e}")
+    
+    def _format_php(self):
+        """格式化PHP序列化值"""
+        if hasattr(self, 'string_text'):
+            try:
+                from ..utils.helpers import format_php_serialize, apply_json_syntax_highlighting
+                current_value = self.string_text.get(1.0, tk.END).strip()
+                formatted = format_php_serialize(current_value)
+                self.string_text.delete(1.0, tk.END)
+                self.string_text.insert(1.0, formatted)
+                # 格式化后的是JSON，应用JSON语法高亮
+                apply_json_syntax_highlighting(self.string_text)
+            except ValueError as e:
+                messagebox.showerror("PHP Serialize Error", str(e))
+            except Exception as e:
+                messagebox.showerror("Error", f"Failed to format PHP serialize: {e}")
+    
+    def _minify_php(self):
+        """压缩PHP序列化值"""
+        if hasattr(self, 'string_text'):
+            try:
+                from ..utils.helpers import minify_php_serialize
+                current_value = self.string_text.get(1.0, tk.END).strip()
+                minified = minify_php_serialize(current_value)
+                self.string_text.delete(1.0, tk.END)
+                self.string_text.insert(1.0, minified)
+            except ValueError as e:
+                messagebox.showerror("PHP Serialize Error", str(e))
+            except Exception as e:
+                messagebox.showerror("Error", f"Failed to minify PHP serialize: {e}")
     
     def _create_key(self):
         """创建键"""

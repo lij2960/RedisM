@@ -8,6 +8,7 @@ import socket
 import re
 import tkinter as tk
 from pathlib import Path
+import phpserialize
 
 
 def format_json(text, indent=2):
@@ -26,6 +27,90 @@ def minify_json(text):
         return json.dumps(parsed, separators=(',', ':'), ensure_ascii=False)
     except json.JSONDecodeError:
         raise ValueError("Invalid JSON format")
+
+
+def format_php_serialize(text):
+    """格式化PHP序列化文本（转换为可读的JSON格式）"""
+    try:
+        # 尝试解析PHP序列化数据
+        if isinstance(text, str):
+            text = text.encode('utf-8')
+        
+        parsed = phpserialize.loads(text)
+        
+        # 转换为JSON格式以便阅读
+        def convert_to_json_compatible(obj):
+            """将PHP对象转换为JSON兼容格式"""
+            if isinstance(obj, dict):
+                return {convert_to_json_compatible(k): convert_to_json_compatible(v) for k, v in obj.items()}
+            elif isinstance(obj, (list, tuple)):
+                return [convert_to_json_compatible(item) for item in obj]
+            elif isinstance(obj, bytes):
+                try:
+                    return obj.decode('utf-8')
+                except:
+                    return obj.decode('latin-1')
+            else:
+                return obj
+        
+        json_compatible = convert_to_json_compatible(parsed)
+        return json.dumps(json_compatible, indent=2, ensure_ascii=False)
+    except Exception as e:
+        # 提供更友好的错误提示
+        error_msg = str(e)
+        if "unexpected opcode" in error_msg.lower():
+            raise ValueError("无法解析 PHP 序列化数据。请确保输入的是有效的 PHP serialize 格式。")
+        else:
+            raise ValueError(f"PHP 序列化格式错误: {error_msg}")
+
+
+def minify_php_serialize(text):
+    """压缩PHP序列化文本
+    
+    智能处理：
+    - 如果输入是JSON格式，先转换为Python对象，再序列化为PHP格式
+    - 如果输入是PHP序列化格式，直接重新序列化（压缩）
+    """
+    try:
+        # 先尝试作为JSON解析
+        try:
+            # 如果是JSON格式，转换为PHP序列化
+            json_data = json.loads(text.strip())
+            
+            # 将JSON数据转换为PHP可序列化的格式
+            def convert_to_php_compatible(obj):
+                """将JSON对象转换为PHP兼容格式"""
+                if isinstance(obj, dict):
+                    # 转换为有序字典，保持键的顺序
+                    return {k: convert_to_php_compatible(v) for k, v in obj.items()}
+                elif isinstance(obj, list):
+                    return [convert_to_php_compatible(item) for item in obj]
+                elif isinstance(obj, str):
+                    return obj.encode('utf-8')
+                else:
+                    return obj
+            
+            php_compatible = convert_to_php_compatible(json_data)
+            serialized = phpserialize.dumps(php_compatible)
+            return serialized.decode('utf-8') if isinstance(serialized, bytes) else serialized
+            
+        except (json.JSONDecodeError, ValueError):
+            # 不是JSON，尝试作为PHP序列化格式处理
+            if isinstance(text, str):
+                text = text.encode('utf-8')
+            
+            parsed = phpserialize.loads(text)
+            serialized = phpserialize.dumps(parsed)
+            
+            return serialized.decode('utf-8') if isinstance(serialized, bytes) else serialized
+            
+    except Exception as e:
+        # 提供更友好的错误提示
+        error_msg = str(e)
+        if "unexpected opcode" in error_msg.lower():
+            raise ValueError("无法解析数据格式。请确保输入的是有效的 PHP 序列化数据或 JSON 格式。")
+        else:
+            raise ValueError(f"数据格式错误: {error_msg}")
 
 
 def apply_json_syntax_highlighting(text_widget):

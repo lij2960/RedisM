@@ -2,3 +2,4 @@ redis==5.0.1
 paramiko==3.4.0
 Pillow>=10.0.0
 pyinstaller>=6.0.0
+phpserialize>=1.3

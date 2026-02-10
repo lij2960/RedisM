@@ -5,6 +5,38 @@ All notable changes to RedisM will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.1.2] - 2025-01-19
+
+### 🚀 Added
+- **PHP Serialize Support**: Comprehensive PHP serialization parsing and formatting
+  - Added "Format PHP" button to parse PHP serialized data and display as readable JSON
+  - Added "Minify PHP" button to re-serialize data in compact PHP serialize format
+  - Integrated PHP serialize functionality across all value display and edit dialogs:
+    - String value editor in key manager
+    - Hash field editor and add dialog
+    - Set member editor and add dialog
+    - List item editor
+    - ZSet member editor and add dialog
+    - Add new key dialog (string type)
+  - PHP formatted data displays with JSON syntax highlighting for readability
+  - Seamless conversion between PHP serialize and JSON formats
+
+### 🔧 Fixed
+- **Smart Format Detection**: Minify PHP now intelligently handles both JSON and PHP serialize input
+  - Automatically detects input format (JSON or PHP serialize)
+  - Converts JSON to PHP serialize format when needed
+  - Prevents "unexpected opcode" error when minifying formatted JSON data
+  - Supports round-trip conversion: PHP → Format → Minify → PHP
+  - Improved error messages with user-friendly Chinese descriptions
+
+### 📦 Dependencies
+- Added `phpserialize>=1.3` library for PHP serialization support
+
+### 🛠️ Build
+- Updated `RedisM.spec` to include `phpserialize` in hiddenimports
+- Updated `build_python.sh` to install all dependencies from requirements.txt
+- Added missing dialog modules to PyInstaller configuration
+
 ## [1.1.1] - 2025-01-19
 
 ### 🔧 Fixed

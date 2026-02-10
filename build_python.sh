@@ -34,7 +34,8 @@ echo "构建 $APP_NAME v$VERSION..."
 
 # 安装依赖
 echo "安装Python依赖..."
-pip install redis paramiko pyinstaller
+pip install -r requirements.txt
+pip install pyinstaller
 
 # 创建图标
 echo "创建应用图标..."

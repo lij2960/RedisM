@@ -4,7 +4,7 @@
 """简化的对话框基类 - 专门用于编辑对话框，支持真正的自适应布局"""
 
 import tkinter as tk
-from tkinter import ttk
+from tkinter import ttk, messagebox
 from .search_mixin import SearchMixin
 
 
@@ -35,6 +35,48 @@ class SimpleDialog(SearchMixin):
         
         # 显示对话框
         self.dialog.deiconify()
+    
+    def _format_php(self):
+        """格式化PHP序列化值（通用方法）"""
+        if not hasattr(self, 'value_text') and not hasattr(self, 'member_text'):
+            return
+        
+        text_widget = getattr(self, 'value_text', None) or getattr(self, 'member_text', None)
+        if not text_widget:
+            return
+        
+        try:
+            from ..utils.helpers import format_php_serialize, apply_json_syntax_highlighting
+            current_value = text_widget.get(1.0, tk.END).strip()
+            formatted = format_php_serialize(current_value)
+            text_widget.delete(1.0, tk.END)
+            text_widget.insert(1.0, formatted)
+            # 格式化后的是JSON，应用JSON语法高亮
+            apply_json_syntax_highlighting(text_widget)
+        except ValueError as e:
+            messagebox.showerror("PHP Serialize Error", str(e))
+        except Exception as e:
+            messagebox.showerror("Error", f"Failed to format PHP serialize: {e}")
+    
+    def _minify_php(self):
+        """压缩PHP序列化值（通用方法）"""
+        if not hasattr(self, 'value_text') and not hasattr(self, 'member_text'):
+            return
+        
+        text_widget = getattr(self, 'value_text', None) or getattr(self, 'member_text', None)
+        if not text_widget:
+            return
+        
+        try:
+            from ..utils.helpers import minify_php_serialize
+            current_value = text_widget.get(1.0, tk.END).strip()
+            minified = minify_php_serialize(current_value)
+            text_widget.delete(1.0, tk.END)
+            text_widget.insert(1.0, minified)
+        except ValueError as e:
+            messagebox.showerror("PHP Serialize Error", str(e))
+        except Exception as e:
+            messagebox.showerror("Error", f"Failed to minify PHP serialize: {e}")
     
     def _setup_geometry(self, size):
         """设置对话框几何属性"""
