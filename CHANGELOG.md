@@ -5,6 +5,31 @@ All notable changes to RedisM will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.1.3] - 2025-01-19
+
+### 🧹 Maintenance
+- **Project Cleanup**: Removed temporary test files and reorganized documentation
+  - Deleted `test_imports.py` and `test_php_serialize.py` test scripts
+  - Deleted `quick_rebuild.sh` (kept main `build_python.sh`)
+  - Moved `PHP_SERIALIZE_USAGE.md` to `docs/` directory
+  - Moved `REBUILD_INSTRUCTIONS.md` to `docs/` directory
+  - Organized project structure for better maintainability
+
+### 📚 Documentation
+- **Enhanced README**: Comprehensive documentation update
+  - Added PHP Serialize feature documentation
+  - Updated feature list with all v1.1.x improvements
+  - Added detailed usage examples for PHP serialize functionality
+  - Improved quick start guide and installation instructions
+  - Enhanced troubleshooting section
+  - Updated version badges and project structure
+
+### 🔧 Build
+- **Improved Build Process**: Streamlined build configuration
+  - Consolidated build scripts
+  - Updated documentation references
+  - Cleaned up temporary build artifacts
+
 ## [1.1.2] - 2025-01-19
 
 ### 🚀 Added
