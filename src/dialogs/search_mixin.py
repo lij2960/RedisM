@@ -97,10 +97,11 @@ class SearchMixin:
                     status_var.set("Text not found")
                     return
         else:
-            # 向后搜索
+            # 向后搜索 - 使用更可靠的方法
+            # 先尝试从当前位置向前搜索
             pos = text_widget.search(search_text, current_pos, "1.0", backwards=True, nocase=True)
             if not pos:
-                # 从末尾开始搜索
+                # 如果没找到，从文件末尾向当前位置搜索
                 pos = text_widget.search(search_text, tk.END, current_pos, backwards=True, nocase=True)
                 if pos:
                     status_var.set("Search wrapped to end")
@@ -113,8 +114,19 @@ class SearchMixin:
         text_widget.tag_add("search_highlight", pos, end_pos)
         text_widget.tag_config("search_highlight", background="yellow", foreground="black")
         
-        # 移动光标并滚动到可见位置
-        text_widget.mark_set(tk.INSERT, end_pos)
+        # 选中找到的文本
+        text_widget.tag_remove(tk.SEL, "1.0", tk.END)
+        text_widget.tag_add(tk.SEL, pos, end_pos)
+        
+        # 根据搜索方向设置光标位置
+        if forward:
+            # 向前搜索：光标移到匹配文本后面，便于下次继续向前搜索
+            text_widget.mark_set(tk.INSERT, end_pos)
+        else:
+            # 向后搜索：光标移到匹配文本前面，便于下次继续向后搜索
+            text_widget.mark_set(tk.INSERT, pos)
+        
+        # 滚动到可见位置
         text_widget.see(pos)
         
         # 更新状态

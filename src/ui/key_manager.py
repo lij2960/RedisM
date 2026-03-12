@@ -1515,11 +1515,12 @@ class KeyManager:
         current_pos = self.value_text.index(tk.INSERT)
         
         # 搜索文本
+        pos = None
         if forward:
-            # 向前搜索
+            # 向前搜索 - 从当前位置向文件末尾搜索
             pos = self.value_text.search(search_text, current_pos, tk.END, nocase=True)
             if not pos:
-                # 从头开始搜索
+                # 从头开始搜索（循环到开头）
                 pos = self.value_text.search(search_text, "1.0", current_pos, nocase=True)
                 if pos:
                     status_var.set("Search wrapped to beginning")
@@ -1527,11 +1528,25 @@ class KeyManager:
                     status_var.set("Text not found")
                     return
         else:
+            # 向后搜索 - 关键修复：确保搜索起始位置正确
+            search_start = current_pos
+            
+            # 如果当前位置有选中的文本，从选中文本的开始位置搜索
+            try:
+                sel_start = self.value_text.index(tk.SEL_FIRST)
+                sel_end = self.value_text.index(tk.SEL_LAST)
+                # 如果光标在选中文本的末尾，从选中文本的开始位置搜索
+                if current_pos == sel_end:
+                    search_start = sel_start
+            except tk.TclError:
+                # 没有选中文本，使用当前光标位置
+                pass
+            
             # 向后搜索
-            pos = self.value_text.search(search_text, current_pos, "1.0", backwards=True, nocase=True)
+            pos = self.value_text.search(search_text, search_start, "1.0", backwards=True, nocase=True)
             if not pos:
-                # 从末尾开始搜索
-                pos = self.value_text.search(search_text, tk.END, current_pos, backwards=True, nocase=True)
+                # 从末尾开始搜索（循环到末尾）
+                pos = self.value_text.search(search_text, tk.END, search_start, backwards=True, nocase=True)
                 if pos:
                     status_var.set("Search wrapped to end")
                 else:
@@ -1543,8 +1558,19 @@ class KeyManager:
         self.value_text.tag_add("search_highlight", pos, end_pos)
         self.value_text.tag_config("search_highlight", background="yellow", foreground="black")
         
-        # 移动光标并滚动到可见位置
-        self.value_text.mark_set(tk.INSERT, end_pos)
+        # 选中找到的文本（这样用户可以看到当前匹配）
+        self.value_text.tag_remove(tk.SEL, "1.0", tk.END)
+        self.value_text.tag_add(tk.SEL, pos, end_pos)
+        
+        # 根据搜索方向设置光标位置
+        if forward:
+            # 向前搜索：光标移到匹配文本后面，便于下次继续向前搜索
+            self.value_text.mark_set(tk.INSERT, end_pos)
+        else:
+            # 向后搜索：光标移到匹配文本前面，便于下次继续向后搜索
+            self.value_text.mark_set(tk.INSERT, pos)
+        
+        # 滚动到可见位置
         self.value_text.see(pos)
         
         # 更新状态
