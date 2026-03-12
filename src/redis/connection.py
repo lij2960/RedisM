@@ -54,9 +54,12 @@ class RedisConnection:
             username=conn_config.get('username') or None,
             db=0,
             decode_responses=True,
-            socket_timeout=5,  # 5秒超时
-            socket_connect_timeout=5,  # 连接超时
+            socket_timeout=3,  # 3秒超时，更快响应
+            socket_connect_timeout=3,  # 连接超时
+            socket_keepalive=True,  # 启用TCP keepalive
+            socket_keepalive_options={},
             retry_on_timeout=True,
+            retry_on_error=[redis.ConnectionError, redis.TimeoutError],
             health_check_interval=30  # 健康检查间隔
         )
         
@@ -116,8 +119,22 @@ class RedisConnection:
                 return False
             
             # 尝试ping测试连接，设置短超时避免阻塞
-            self.redis_client.ping()
-            return True
+            import socket
+            original_timeout = self.redis_client.connection_pool.connection_kwargs.get('socket_timeout', 5)
+            
+            # 临时设置短超时进行连接测试
+            self.redis_client.connection_pool.connection_kwargs['socket_timeout'] = 2
+            self.redis_client.connection_pool.connection_kwargs['socket_connect_timeout'] = 2
+            
+            try:
+                self.redis_client.ping()
+                # 恢复原超时设置
+                self.redis_client.connection_pool.connection_kwargs['socket_timeout'] = original_timeout
+                return True
+            except (redis.ConnectionError, redis.TimeoutError, socket.timeout, socket.error) as ping_error:
+                # 恢复原超时设置
+                self.redis_client.connection_pool.connection_kwargs['socket_timeout'] = original_timeout
+                raise ping_error
             
         except Exception as ping_error:
             print(f"Connection lost: {ping_error}")
@@ -147,18 +164,40 @@ class RedisConnection:
     def check_and_reconnect_async(self, success_callback=None, error_callback=None):
         """异步检查连接状态并重连，避免阻塞UI"""
         import threading
+        import time
         
         def reconnect_thread():
             try:
+                # 设置重连超时时间（总共最多30秒）
+                start_time = time.time()
+                max_duration = 30
+                
                 result = self.check_and_reconnect()
+                
+                # 检查是否超时
+                if time.time() - start_time > max_duration:
+                    if error_callback:
+                        error_callback("Reconnection timeout after 30 seconds")
+                    return
+                
                 if success_callback:
                     success_callback(result)
             except Exception as e:
                 if error_callback:
                     error_callback(str(e))
         
-        # 在后台线程中执行重连
-        threading.Thread(target=reconnect_thread, daemon=True).start()
+        # 在后台线程中执行重连，设置超时
+        thread = threading.Thread(target=reconnect_thread, daemon=True)
+        thread.start()
+        
+        # 设置线程超时监控
+        def timeout_monitor():
+            time.sleep(35)  # 比重连超时稍长一点
+            if thread.is_alive():
+                if error_callback:
+                    error_callback("Reconnection thread timeout")
+        
+        threading.Thread(target=timeout_monitor, daemon=True).start()
     
     def test_connection(self, conn_config):
         """测试连接配置"""

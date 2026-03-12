@@ -7,6 +7,8 @@ import tkinter as tk
 from tkinter import ttk, messagebox, simpledialog
 import threading
 import json
+import redis
+import socket
 
 from ..config import *
 from ..redis.operations import RedisOperations
@@ -348,10 +350,24 @@ class KeyManager:
                     self.main_window.root.after(0, lambda: messagebox.showerror("Error", "No Redis connection available"))
                     return
                 
-                # 快速ping测试，设置短超时
-                redis_client.ping()
-                # 连接正常，直接加载
-                self._continue_load_key_details(key)
+                # 使用短超时进行快速ping测试，避免阻塞UI
+                import socket
+                original_timeout = redis_client.connection_pool.connection_kwargs.get('socket_timeout', 5)
+                
+                # 临时设置短超时进行连接测试
+                redis_client.connection_pool.connection_kwargs['socket_timeout'] = 2
+                redis_client.connection_pool.connection_kwargs['socket_connect_timeout'] = 2
+                
+                try:
+                    # 快速ping测试
+                    redis_client.ping()
+                    # 连接正常，恢复原超时设置并直接加载
+                    redis_client.connection_pool.connection_kwargs['socket_timeout'] = original_timeout
+                    self._continue_load_key_details(key)
+                except (redis.ConnectionError, redis.TimeoutError, socket.timeout, socket.error) as ping_error:
+                    # 恢复原超时设置
+                    redis_client.connection_pool.connection_kwargs['socket_timeout'] = original_timeout
+                    raise ping_error
                 
             except Exception as e:
                 # 连接有问题，异步重连
@@ -387,23 +403,36 @@ class KeyManager:
                 redis_client = self.main_window.get_redis_client()
                 redis_ops = RedisOperations(redis_client)
                 
-                # 获取键信息
-                key_info = redis_ops.get_key_info(key)
-                if not key_info:
-                    self.main_window.root.after(0, lambda: messagebox.showerror("Error", f"Key '{key}' does not exist"))
-                    self.main_window.root.after(0, lambda: self.main_window.right_panel.update_status("❌ Key not found"))
-                    return
+                # 设置短超时进行操作，避免长时间阻塞
+                original_timeout = redis_client.connection_pool.connection_kwargs.get('socket_timeout', 5)
+                redis_client.connection_pool.connection_kwargs['socket_timeout'] = 5  # 5秒超时用于数据操作
                 
-                # 获取值
-                value = redis_ops.get_key_value(key, key_info['type'])
-                
-                self.main_window.root.after(0, lambda: self._show_key_details(key, key_info, value))
-                self.main_window.root.after(0, lambda: self.main_window.right_panel.update_status(f"✅ Loaded key '{key}'"))
+                try:
+                    # 获取键信息
+                    key_info = redis_ops.get_key_info(key)
+                    if not key_info:
+                        self.main_window.root.after(0, lambda: messagebox.showerror("Error", f"Key '{key}' does not exist"))
+                        self.main_window.root.after(0, lambda: self.main_window.right_panel.update_status("❌ Key not found"))
+                        return
+                    
+                    # 获取值
+                    value = redis_ops.get_key_value(key, key_info['type'])
+                    
+                    # 恢复原超时设置
+                    redis_client.connection_pool.connection_kwargs['socket_timeout'] = original_timeout
+                    
+                    self.main_window.root.after(0, lambda: self._show_key_details(key, key_info, value))
+                    self.main_window.root.after(0, lambda: self.main_window.right_panel.update_status(f"✅ Loaded key '{key}'"))
+                    
+                except Exception as op_error:
+                    # 恢复原超时设置
+                    redis_client.connection_pool.connection_kwargs['socket_timeout'] = original_timeout
+                    raise op_error
                 
             except Exception as e:
                 error_msg = f"Failed to load key '{key}': {str(e)}"
                 # 检查是否是连接相关的错误
-                if "connection" in str(e).lower() or "timeout" in str(e).lower():
+                if any(err_type in str(e).lower() for err_type in ["connection", "timeout", "broken pipe", "reset"]):
                     # 连接错误，再次尝试异步重连
                     def retry_on_success(result):
                         if result:
@@ -1267,10 +1296,21 @@ class KeyManager:
                         self.main_window.root.after(0, lambda: messagebox.showerror("Error", "No Redis connection available"))
                         return
                     
-                    # 快速ping测试
-                    redis_client.ping()
-                    # 连接正常，执行删除
-                    self._continue_delete_key(key)
+                    # 使用短超时进行快速ping测试
+                    original_timeout = redis_client.connection_pool.connection_kwargs.get('socket_timeout', 5)
+                    redis_client.connection_pool.connection_kwargs['socket_timeout'] = 2
+                    redis_client.connection_pool.connection_kwargs['socket_connect_timeout'] = 2
+                    
+                    try:
+                        # 快速ping测试
+                        redis_client.ping()
+                        # 恢复原超时设置并执行删除
+                        redis_client.connection_pool.connection_kwargs['socket_timeout'] = original_timeout
+                        self._continue_delete_key(key)
+                    except (redis.ConnectionError, redis.TimeoutError, socket.timeout, socket.error) as ping_error:
+                        # 恢复原超时设置
+                        redis_client.connection_pool.connection_kwargs['socket_timeout'] = original_timeout
+                        raise ping_error
                     
                 except Exception as e:
                     # 连接有问题，异步重连
