@@ -145,12 +145,20 @@ class CLIInterface:
                 # 执行命令
                 result = redis_client.execute_command(*parts)
                 
-                # 格式化结果
+                # 格式化结果 - 在后台线程中完成，避免大数据集阻塞UI
                 if isinstance(result, (list, tuple)):
                     if len(result) == 0:
                         formatted_result = "(empty list or set)"
                     else:
-                        formatted_result = "\n".join([f"{i+1}) {item}" for i, item in enumerate(result)])
+                        lines = [f"{i+1}) {item}" for i, item in enumerate(result)]
+                        formatted_result = "\n".join(lines)
+                elif isinstance(result, set):
+                    # 修复：SMEMBERS 返回 set 类型
+                    if len(result) == 0:
+                        formatted_result = "(empty set)"
+                    else:
+                        lines = [f"{i+1}) {item}" for i, item in enumerate(sorted(result))]
+                        formatted_result = "\n".join(lines)
                 elif isinstance(result, dict):
                     formatted_result = "\n".join([f"{k}: {v}" for k, v in result.items()])
                 elif result is None:
@@ -158,22 +166,19 @@ class CLIInterface:
                 else:
                     formatted_result = str(result)
                 
-                # 显示结果
-                self.main_window.root.after(0, lambda: self._append_output(f"redis> {command}"))
-                self.main_window.root.after(0, lambda: self._append_output(formatted_result))
-                self.main_window.root.after(0, lambda: self._append_output(""))
+                # 显示结果（在主线程中更新UI）
+                output = f"redis> {command}\n{formatted_result}\n"
+                self.main_window.root.after(0, lambda: self._append_output_bulk(output))
                 
             except Exception as e:
-                error_msg = f"Error: {str(e)}"
-                self.main_window.root.after(0, lambda: self._append_output(f"redis> {command}"))
-                self.main_window.root.after(0, lambda: self._append_output(error_msg))
-                self.main_window.root.after(0, lambda: self._append_output(""))
+                error_msg = f"redis> {command}\nError: {str(e)}\n"
+                self.main_window.root.after(0, lambda: self._append_output_bulk(error_msg))
         
         threading.Thread(target=execute_thread, daemon=True).start()
         
-        # 清空输入
-        self.cmd_var.set("")
-        self._hide_suggestions()
+        # 清空输入（在主线程中执行）
+        self.main_window.root.after(0, lambda: self.cmd_var.set(""))
+        self.main_window.root.after(0, self._hide_suggestions)
     
     def _on_cmd_key_release(self, event):
         """命令输入键释放事件"""
@@ -241,6 +246,13 @@ class CLIInterface:
         """追加输出文本"""
         self.output_text.config(state=tk.NORMAL)
         self.output_text.insert(tk.END, text + "\n")
+        self.output_text.see(tk.END)
+        self.output_text.config(state=tk.DISABLED)
+    
+    def _append_output_bulk(self, text):
+        """一次性追加大量输出文本，避免多次 UI 更新导致卡顿"""
+        self.output_text.config(state=tk.NORMAL)
+        self.output_text.insert(tk.END, text)
         self.output_text.see(tk.END)
         self.output_text.config(state=tk.DISABLED)
     
