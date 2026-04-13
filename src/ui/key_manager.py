@@ -485,8 +485,21 @@ class KeyManager:
         key_text.config(state=tk.DISABLED)
         
         ttk.Label(info_frame, text=f"Type: {key_type}").pack(anchor=tk.W)
+        
+        # TTL 显示和编辑
+        ttl_frame = ttk.Frame(info_frame)
+        ttl_frame.pack(anchor=tk.W, fill=tk.X)
+        
         ttl_text = ttl if ttl > 0 else 'Never expires'
-        ttk.Label(info_frame, text=f"TTL: {ttl_text}").pack(anchor=tk.W)
+        self.ttl_label = ttk.Label(ttl_frame, text=f"TTL: {ttl_text}")
+        self.ttl_label.pack(side=tk.LEFT)
+        
+        # 存储当前key和ttl用于编辑
+        self.current_key = key
+        self.current_ttl = ttl
+        
+        ttk.Button(ttl_frame, text="✏️", width=3, 
+                  command=lambda: self._edit_ttl(key, ttl)).pack(side=tk.LEFT, padx=(10, 0))
         
         # 固定区域：查询框架 (第1行) - 固定高度，不随窗口放大而增高
         query_section = self._create_fixed_section(1)
@@ -1285,6 +1298,66 @@ class KeyManager:
         # 这里实现复杂的结构化数据更新逻辑
         # 包括过滤状态的处理等
         pass
+    
+    def _edit_ttl(self, key, current_ttl):
+        """编辑键的TTL"""
+        from tkinter import simpledialog
+        
+        # 构建提示信息
+        if current_ttl > 0:
+            prompt = f"Current TTL: {current_ttl} seconds\n\nEnter new TTL in seconds:\n(Enter -1 to remove expiration, 0 to delete key immediately)"
+            initial_value = str(current_ttl)
+        else:
+            prompt = "Key has no expiration.\n\nEnter TTL in seconds:\n(Enter -1 to keep no expiration)"
+            initial_value = "-1"
+        
+        # 弹出输入对话框
+        new_ttl_str = simpledialog.askstring(
+            "Edit TTL",
+            prompt,
+            initialvalue=initial_value,
+            parent=self.main_window.root
+        )
+        
+        if new_ttl_str is None:
+            return  # 用户取消
+        
+        try:
+            new_ttl = int(new_ttl_str.strip())
+        except ValueError:
+            messagebox.showerror("Error", "Please enter a valid integer")
+            return
+        
+        # 执行TTL更新
+        def update_ttl_thread():
+            try:
+                redis_client = self.main_window.get_redis_client()
+                if not redis_client:
+                    self.main_window.root.after(0, lambda: messagebox.showerror("Error", "No Redis connection available"))
+                    return
+                
+                if new_ttl == 0:
+                    # TTL为0，删除键
+                    redis_client.delete(key)
+                    self.main_window.root.after(0, lambda: messagebox.showinfo("Success", f"Key '{key}' has been deleted"))
+                    self.main_window.root.after(0, lambda: self.main_window.left_panel.search_keys())
+                    self.main_window.root.after(0, self.clear_details)
+                elif new_ttl < 0:
+                    # 移除过期时间
+                    redis_client.persist(key)
+                    self.main_window.root.after(0, lambda: messagebox.showinfo("Success", "Expiration removed"))
+                    self.main_window.root.after(0, lambda: self.load_key_details(key))
+                else:
+                    # 设置新的TTL
+                    redis_client.expire(key, new_ttl)
+                    self.main_window.root.after(0, lambda: messagebox.showinfo("Success", f"TTL set to {new_ttl} seconds"))
+                    self.main_window.root.after(0, lambda: self.load_key_details(key))
+                    
+            except Exception as e:
+                self.main_window.root.after(0, lambda: messagebox.showerror("Error", f"Failed to update TTL: {e}"))
+        
+        import threading
+        threading.Thread(target=update_ttl_thread, daemon=True).start()
     
     def _delete_key(self, key):
         """删除键"""

@@ -179,8 +179,23 @@ class RedisOperations:
         except Exception as e:
             return f"Error reading value: {str(e)}"
     
-    def set_key_value(self, key, value, key_type):
-        """设置键值"""
+    def set_key_value(self, key, value, key_type, preserve_ttl=True):
+        """设置键值
+        
+        Args:
+            key: 键名
+            value: 值
+            key_type: 键类型
+            preserve_ttl: 是否保留原有的TTL，默认为True
+        """
+        # 先获取原有的TTL
+        original_ttl = None
+        if preserve_ttl:
+            original_ttl = self.redis_client.ttl(key)
+            # TTL返回-1表示永不过期，-2表示键不存在
+            if original_ttl is not None and original_ttl < 0:
+                original_ttl = None
+        
         if key_type == 'string':
             self.redis_client.set(key, value)
         elif key_type == 'hash':
@@ -197,6 +212,10 @@ class RedisOperations:
                 self.redis_client.set(key, value)
         else:
             self.redis_client.set(key, value)
+        
+        # 恢复原有的TTL
+        if original_ttl is not None and original_ttl > 0:
+            self.redis_client.expire(key, original_ttl)
     
     def delete_key(self, key):
         """删除键"""
@@ -258,6 +277,11 @@ class RedisOperations:
     def list_remove_by_index(self, key, index):
         """从列表中删除指定索引的元素"""
         try:
+            # 先获取原有的TTL
+            original_ttl = self.redis_client.ttl(key)
+            if original_ttl is not None and original_ttl < 0:
+                original_ttl = None
+            
             # 获取当前列表
             current_list = self.redis_client.lrange(key, 0, -1)
             if 0 <= index < len(current_list):
@@ -269,6 +293,9 @@ class RedisOperations:
                 pipe.delete(key)
                 if current_list:  # 如果列表不为空，重新添加所有元素
                     pipe.rpush(key, *current_list)
+                    # 恢复原有的TTL
+                    if original_ttl is not None and original_ttl > 0:
+                        pipe.expire(key, original_ttl)
                 pipe.execute()
                 return True
             return False
