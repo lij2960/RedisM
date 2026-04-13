@@ -484,6 +484,15 @@ class LeftPanel:
     
     def _on_search_click(self):
         """搜索按钮点击处理 - 提供视觉反馈"""
+        # 清理本地缓存，确保刷新后展示正确
+        self.expanded_groups = set()
+        self.selected_line = None
+        self.keys_data = {}
+        self.group_data = {}
+        self.tree_structure = {}
+        self.current_keys = []
+        self.total_keys_estimate = None
+        
         # 临时改变按钮文本，显示正在搜索
         original_text = self.search_btn.cget('text')
         self.search_btn.config(text="🔄", state="disabled")
