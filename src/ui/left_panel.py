@@ -724,7 +724,7 @@ class LeftPanel:
             # 对分组名称进行排序
             sorted_names = sorted([name for name in structure.keys() if not name.startswith('_')])
             
-            for name in sorted_names:
+            for idx, name in enumerate(sorted_names):
                 data = structure[name]
                 
                 # 计算该分组的总键数
@@ -734,8 +734,10 @@ class LeftPanel:
                 # 如果分组只有一个键且没有子分组，直接显示键
                 if total_keys == 1 and not data.get('_children') and data.get('_keys'):
                     key = data['_keys'][0]
-                    indent = "    " * level
-                    key_line = f"{indent}🔑 {key}"
+                    key_indent = "    " * level + "  "
+                    is_last = idx == len(sorted_names) - 1
+                    connector = "└─" if is_last else "├─"
+                    key_line = f"{key_indent}{connector} 🔑 {key}"
                     lines.append(key_line)
                     self.keys_data[len(lines)] = key
                     continue
@@ -752,14 +754,21 @@ class LeftPanel:
                 
                 # 如果展开，显示子内容
                 if is_expanded:
+                    # 先收集所有要显示的子项（子分组和键）
+                    child_groups = sorted([n for n in data.get('_children', {}).keys() if not n.startswith('_')])
+                    child_keys = data.get('_keys', [])
+                    total_items = len(child_groups) + len(child_keys)
+                    current_item = 0
+                    
                     if '_children' in data and data['_children']:
                         add_tree_items(data['_children'], level + 1, group_path)
+                        current_item += len(child_groups)
                     
                     if '_keys' in data and data['_keys']:
                         # 键已经在_sort_tree_structure中排序过了
-                        for i, key in enumerate(data['_keys']):
+                        for i, key in enumerate(child_keys):
                             key_indent = "    " * (level + 1) + "  "
-                            is_last = i == len(data['_keys']) - 1 and not data.get('_children')
+                            is_last = (current_item + i) == (total_items - 1)
                             connector = "└─" if is_last else "├─"
                             key_line = f"{key_indent}{connector} 🔑 {key}"
                             lines.append(key_line)
