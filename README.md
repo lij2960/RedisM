@@ -1,10 +1,10 @@
-# RedisM v1.1.3
+# RedisM v1.1.4
 
 <div align="center">
 
 **现代化的Redis管理工具**
 
-[![Version](https://img.shields.io/badge/version-1.1.3-blue.svg)](#)
+[![Version](https://img.shields.io/badge/version-1.1.4-blue.svg)](#)
 [![Python](https://img.shields.io/badge/python-3.8+-green.svg)](https://python.org)
 [![Redis](https://img.shields.io/badge/Redis-5.0+-red.svg)](https://redis.io)
 [![Platform](https://img.shields.io/badge/platform-macOS%20%7C%20Linux%20%7C%20Windows-lightgrey.svg)](#)
@@ -32,11 +32,12 @@
 - **批量操作**: 支持批量添加、删除和编辑数据项
 - **实时过滤**: 对所有数据类型提供实时搜索和过滤功能，显示统计信息
 - **JSON处理**: 内置JSON格式化、压缩和语法高亮显示
-- **PHP Serialize支持**: 完整的PHP序列化数据格式化和压缩功能 ⭐ 新功能
+- **PHP Serialize支持**: 完整的PHP序列化数据格式化和压缩功能
 
 ### 🔑 键管理
 - **树形结构**: 按分隔符自动组织键的层级结构显示
 - **智能搜索**: 支持通配符模式匹配和关键词搜索
+- **批量删除**: 支持按模式批量删除键 ⭐ 新功能
 - **数据库一致性**: 确保所有操作在正确的数据库中执行，避免意外切换
 - **一键创建**: 支持创建所有类型的Redis键，包含TTL设置
 
@@ -45,13 +46,15 @@
 - **自适应对话框**: 所有编辑对话框支持真正的自适应高度调整
 - **响应式布局**: 自适应窗口大小的响应式界面布局
 - **JSON语法高亮**: 所有JSON文本区域支持彩色语法高亮显示
-- **搜索功能**: 所有文本编辑窗口支持⌘F快速搜索
+- **搜索功能**: 所有文本编辑窗口支持⌘F快速搜索，支持向前/向后查找
 
-### 💻 开发工具
-- **命令行界面**: 内置完整的Redis命令行，支持所有Redis命令
+### 💻 命令行界面 ⭐ 增强
+- **完整命令支持**: 内置完整的Redis命令行，支持所有Redis命令
+- **自定义命令**: 支持 DELPATTERN 和 COUNTPATTERN 扩展命令
+- **危险命令保护**: FLUSHDB、FLUSHALL、DELPATTERN 执行前需确认
 - **实时执行**: 命令即时执行和结果显示
-- **历史记录**: 命令执行历史和智能补全
-- **错误处理**: 详细的错误提示和异常处理机制
+- **智能补全**: Tab键自动补全命令
+- **大数据集优化**: 优化 SMEMBERS 等返回大量数据的命令处理
 
 ### 🆕 PHP Serialize 支持 (v1.1.2+)
 
@@ -99,6 +102,44 @@ a:2:{s:4:"name";s:4:"test";s:3:"age";i:30;}
 - ✅ 添加新键对话框（String类型）
 
 详细使用说明请查看 [PHP Serialize使用文档](docs/PHP_SERIALIZE_USAGE.md)
+
+### 🆕 CLI 扩展命令 (v1.1.4+)
+
+RedisM 命令行界面支持以下扩展命令：
+
+#### DELPATTERN - 批量删除键
+按模式批量删除匹配的键，使用 SCAN 命令避免阻塞 Redis。
+
+```bash
+# 删除所有以 user: 开头的键
+redis> DELPATTERN user:*
+Scanning keys matching pattern: user:*...
+Successfully deleted 150 keys matching 'user:*'
+
+# 删除所有以 cache: 开头的键
+redis> DELPATTERN cache:*
+```
+
+⚠️ **安全提示**: 执行前会弹出确认对话框，防止误删除。
+
+#### COUNTPATTERN - 统计匹配键数量
+统计匹配指定模式的键数量，不会删除任何数据。
+
+```bash
+# 统计所有以 session: 开头的键
+redis> COUNTPATTERN session:*
+Counting keys matching pattern: session:*...
+Found 1234 keys matching 'session:*'
+
+# 统计所有键
+redis> COUNTPATTERN *
+```
+
+#### 危险命令保护
+以下命令执行前需要确认：
+- **FLUSHDB** - 删除当前数据库所有键
+- **FLUSHALL** - 删除所有数据库的所有键
+- **DELPATTERN** - 批量删除匹配的键
 
 ## 🚀 快速开始
 
@@ -267,7 +308,24 @@ RedisM/
 
 ## 📝 更新日志
 
-### v1.1.3 (2025-01-19) - 当前版本
+### v1.1.4 (2026-04-13) - 当前版本
+- 🚀 **CLI增强**: 命令行界面功能扩展
+  - 新增 DELPATTERN 命令：按模式批量删除键
+  - 新增 COUNTPATTERN 命令：统计匹配键数量
+  - 危险命令保护：FLUSHDB、FLUSHALL、DELPATTERN 执行前需确认
+  - 修复 SMEMBERS 等命令返回大数据集时的卡死问题
+  - 优化命令结果格式化，支持 set 类型返回值
+
+- 🔧 **搜索修复**: 文本搜索功能完善
+  - 修复 Find Previous 按钮不工作的问题
+  - 优化搜索光标位置管理
+  - 所有搜索框统一修复
+
+- 🛠️ **稳定性**: 连接和操作优化
+  - 改进连接超时处理
+  - 优化大数据集的 UI 更新
+
+### v1.1.3 (2025-01-19)
 - 🧹 **维护**: 项目清理和文档重组
   - 删除临时测试文件
   - 整理文档结构到docs目录
@@ -391,10 +449,10 @@ RedisM/
 
 <div align="center">
 
-**RedisM v1.1.3** - 让Redis管理变得简单而优雅 ✨
+**RedisM v1.1.4** - 让Redis管理变得简单而优雅 ✨
 
 Made with ❤️ for Redis developers worldwide
 
-[⬆️ 回到顶部](#redism-v113)
+[⬆️ 回到顶部](#redism-v114)
 
 </div>

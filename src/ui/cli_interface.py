@@ -4,8 +4,9 @@
 """CLI界面"""
 
 import tkinter as tk
-from tkinter import ttk
+from tkinter import ttk, messagebox
 import threading
+import re
 
 from ..config import *
 
@@ -17,7 +18,7 @@ class CLIInterface:
         self.parent = parent
         self.main_window = main_window
         
-        # Redis命令列表
+        # Redis命令列表（添加自定义命令）
         self.redis_commands = [
             'GET', 'SET', 'DEL', 'EXISTS', 'KEYS', 'TYPE', 'TTL', 'EXPIRE',
             'HGET', 'HSET', 'HDEL', 'HKEYS', 'HVALS', 'HGETALL', 'HEXISTS',
@@ -25,8 +26,13 @@ class CLIInterface:
             'SADD', 'SREM', 'SMEMBERS', 'SCARD', 'SISMEMBER',
             'ZADD', 'ZREM', 'ZRANGE', 'ZCARD', 'ZSCORE',
             'PING', 'INFO', 'SELECT', 'FLUSHDB', 'FLUSHALL', 'DBSIZE',
-            'INCR', 'DECR', 'INCRBY', 'DECRBY', 'APPEND', 'STRLEN'
+            'INCR', 'DECR', 'INCRBY', 'DECRBY', 'APPEND', 'STRLEN',
+            # 自定义命令
+            'DELPATTERN', 'COUNTPATTERN'
         ]
+        
+        # 危险命令列表（需要确认）
+        self.dangerous_commands = ['FLUSHDB', 'FLUSHALL', 'DELPATTERN']
         
         self._setup_ui()
     
@@ -100,6 +106,20 @@ class CLIInterface:
         if not command:
             return
         
+        # 解析命令
+        parts = command.split()
+        if not parts:
+            return
+        
+        cmd_name = parts[0].upper()
+        
+        # 检查是否是危险命令，需要确认
+        if cmd_name in self.dangerous_commands:
+            if not self._confirm_dangerous_command(cmd_name, command):
+                self._append_output(f"redis> {command}")
+                self._append_output("Command cancelled by user.\n")
+                return
+        
         def execute_thread():
             try:
                 # 先尝试快速检查连接
@@ -131,6 +151,36 @@ class CLIInterface:
         
         threading.Thread(target=execute_thread, daemon=True).start()
     
+    def _confirm_dangerous_command(self, cmd_name, full_command):
+        """确认危险命令"""
+        if cmd_name == 'FLUSHDB':
+            return messagebox.askyesno(
+                "⚠️ Dangerous Command",
+                "FLUSHDB will DELETE ALL KEYS in the current database!\n\n"
+                "This action cannot be undone.\n\n"
+                "Are you sure you want to continue?",
+                icon='warning'
+            )
+        elif cmd_name == 'FLUSHALL':
+            return messagebox.askyesno(
+                "⚠️ EXTREMELY Dangerous Command",
+                "FLUSHALL will DELETE ALL KEYS in ALL DATABASES!\n\n"
+                "This action cannot be undone.\n\n"
+                "Are you ABSOLUTELY sure you want to continue?",
+                icon='warning'
+            )
+        elif cmd_name == 'DELPATTERN':
+            parts = full_command.split(maxsplit=1)
+            pattern = parts[1] if len(parts) > 1 else "*"
+            return messagebox.askyesno(
+                "⚠️ Batch Delete Command",
+                f"DELPATTERN will delete all keys matching pattern: '{pattern}'\n\n"
+                "This action cannot be undone.\n\n"
+                "Are you sure you want to continue?",
+                icon='warning'
+            )
+        return True
+    
     def _continue_execute_command(self, command):
         """继续执行命令（在连接确认后）"""
         def execute_thread():
@@ -142,33 +192,29 @@ class CLIInterface:
                 if not parts:
                     return
                 
-                # 执行命令
+                cmd_name = parts[0].upper()
+                
+                # 处理自定义命令
+                if cmd_name == 'DELPATTERN':
+                    self._execute_delpattern(command, parts)
+                    return
+                elif cmd_name == 'COUNTPATTERN':
+                    self._execute_countpattern(command, parts)
+                    return
+                
+                # 执行标准 Redis 命令
                 result = redis_client.execute_command(*parts)
                 
                 # 格式化结果 - 在后台线程中完成，避免大数据集阻塞UI
-                if isinstance(result, (list, tuple)):
-                    if len(result) == 0:
-                        formatted_result = "(empty list or set)"
-                    else:
-                        lines = [f"{i+1}) {item}" for i, item in enumerate(result)]
-                        formatted_result = "\n".join(lines)
-                elif isinstance(result, set):
-                    # 修复：SMEMBERS 返回 set 类型
-                    if len(result) == 0:
-                        formatted_result = "(empty set)"
-                    else:
-                        lines = [f"{i+1}) {item}" for i, item in enumerate(sorted(result))]
-                        formatted_result = "\n".join(lines)
-                elif isinstance(result, dict):
-                    formatted_result = "\n".join([f"{k}: {v}" for k, v in result.items()])
-                elif result is None:
-                    formatted_result = "(nil)"
-                else:
-                    formatted_result = str(result)
+                formatted_result = self._format_result(result)
                 
                 # 显示结果（在主线程中更新UI）
                 output = f"redis> {command}\n{formatted_result}\n"
                 self.main_window.root.after(0, lambda: self._append_output_bulk(output))
+                
+                # 如果是 FLUSHDB 或 FLUSHALL，刷新左侧键列表
+                if cmd_name in ['FLUSHDB', 'FLUSHALL']:
+                    self.main_window.root.after(100, lambda: self.main_window.left_panel.search_keys())
                 
             except Exception as e:
                 error_msg = f"redis> {command}\nError: {str(e)}\n"
@@ -179,6 +225,110 @@ class CLIInterface:
         # 清空输入（在主线程中执行）
         self.main_window.root.after(0, lambda: self.cmd_var.set(""))
         self.main_window.root.after(0, self._hide_suggestions)
+    
+    def _format_result(self, result):
+        """格式化命令结果"""
+        if isinstance(result, (list, tuple)):
+            if len(result) == 0:
+                return "(empty list or set)"
+            else:
+                lines = [f"{i+1}) {item}" for i, item in enumerate(result)]
+                return "\n".join(lines)
+        elif isinstance(result, set):
+            if len(result) == 0:
+                return "(empty set)"
+            else:
+                lines = [f"{i+1}) {item}" for i, item in enumerate(sorted(result))]
+                return "\n".join(lines)
+        elif isinstance(result, dict):
+            return "\n".join([f"{k}: {v}" for k, v in result.items()])
+        elif result is None:
+            return "(nil)"
+        else:
+            return str(result)
+    
+    def _execute_delpattern(self, command, parts):
+        """执行 DELPATTERN 命令 - 批量删除匹配模式的 key"""
+        try:
+            redis_client = self.main_window.get_redis_client()
+            
+            # 获取模式参数
+            pattern = parts[1] if len(parts) > 1 else "*"
+            
+            self.main_window.root.after(0, lambda: self._append_output(f"redis> {command}"))
+            self.main_window.root.after(0, lambda: self._append_output(f"Scanning keys matching pattern: {pattern}..."))
+            
+            # 使用 SCAN 命令获取匹配的 key（避免 KEYS 命令阻塞）
+            deleted_count = 0
+            cursor = 0
+            batch_size = 100
+            
+            while True:
+                cursor, keys = redis_client.scan(cursor=cursor, match=pattern, count=batch_size)
+                
+                if keys:
+                    # 批量删除
+                    deleted = redis_client.delete(*keys)
+                    deleted_count += deleted
+                    
+                    # 更新进度
+                    self.main_window.root.after(0, lambda c=deleted_count: 
+                        self._update_progress(f"Deleted {c} keys..."))
+                
+                if cursor == 0:
+                    break
+            
+            # 显示结果
+            result_msg = f"Successfully deleted {deleted_count} keys matching '{pattern}'\n"
+            self.main_window.root.after(0, lambda: self._append_output(result_msg))
+            
+            # 刷新左侧键列表
+            self.main_window.root.after(100, lambda: self.main_window.left_panel.search_keys())
+            
+        except Exception as e:
+            error_msg = f"Error: {str(e)}\n"
+            self.main_window.root.after(0, lambda: self._append_output(error_msg))
+    
+    def _execute_countpattern(self, command, parts):
+        """执行 COUNTPATTERN 命令 - 统计匹配模式的 key 数量"""
+        try:
+            redis_client = self.main_window.get_redis_client()
+            
+            # 获取模式参数
+            pattern = parts[1] if len(parts) > 1 else "*"
+            
+            self.main_window.root.after(0, lambda: self._append_output(f"redis> {command}"))
+            self.main_window.root.after(0, lambda: self._append_output(f"Counting keys matching pattern: {pattern}..."))
+            
+            # 使用 SCAN 命令统计匹配的 key 数量
+            count = 0
+            cursor = 0
+            batch_size = 1000
+            
+            while True:
+                cursor, keys = redis_client.scan(cursor=cursor, match=pattern, count=batch_size)
+                count += len(keys)
+                
+                if cursor == 0:
+                    break
+            
+            # 显示结果
+            result_msg = f"Found {count} keys matching '{pattern}'\n"
+            self.main_window.root.after(0, lambda: self._append_output(result_msg))
+            
+        except Exception as e:
+            error_msg = f"Error: {str(e)}\n"
+            self.main_window.root.after(0, lambda: self._append_output(error_msg))
+    
+    def _update_progress(self, message):
+        """更新进度信息（覆盖上一行）"""
+        self.output_text.config(state=tk.NORMAL)
+        # 删除最后一行
+        self.output_text.delete("end-2l", "end-1l")
+        # 添加新的进度信息
+        self.output_text.insert(tk.END, message + "\n")
+        self.output_text.see(tk.END)
+        self.output_text.config(state=tk.DISABLED)
     
     def _on_cmd_key_release(self, event):
         """命令输入键释放事件"""

@@ -5,6 +5,32 @@ All notable changes to RedisM will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.1.4] - 2026-04-13
+
+### 🚀 Added
+- **CLI Extended Commands**: New custom commands for batch operations
+  - `DELPATTERN <pattern>`: Batch delete keys matching a pattern using SCAN (non-blocking)
+  - `COUNTPATTERN <pattern>`: Count keys matching a pattern without deletion
+  - Dangerous command protection: FLUSHDB, FLUSHALL, DELPATTERN require confirmation dialog
+  - Auto-refresh key list after batch delete operations
+
+### 🔧 Fixed
+- **SMEMBERS Command**: Fixed CLI freezing when executing SMEMBERS on large sets
+  - Added proper handling for Python `set` type return values
+  - Optimized result formatting for large datasets
+  - Moved formatting to background thread to prevent UI blocking
+
+- **Search Functionality**: Fixed "Find Previous" button not working
+  - Corrected cursor position management for backward search
+  - Fixed search start position handling with selected text
+  - Applied fix to all search dialogs (key_manager.py and search_mixin.py)
+
+### 🛠️ Improved
+- **CLI Output**: Optimized command output handling
+  - Bulk output updates to reduce UI flickering
+  - Better progress feedback for batch operations
+  - Thread-safe UI updates
+
 ## [1.1.3] - 2025-01-19
 
 ### 🧹 Maintenance
