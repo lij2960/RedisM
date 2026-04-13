@@ -888,6 +888,67 @@ class LeftPanel:
             self.keys_text.tag_remove('hover', f"{self.current_hover_line}.0", f"{self.current_hover_line}.end")
         self.current_hover_line = None
     
+    def _get_structure_at_path(self, path):
+        """根据路径获取树结构中的节点"""
+        if not path:
+            return self.tree_structure
+        
+        parts = path.split('/')
+        current = self.tree_structure
+        
+        for part in parts:
+            if part in current:
+                current = current[part].get('_children', {})
+            else:
+                return None
+        
+        return current
+    
+    def _get_single_child_chain(self, group_path):
+        """
+        获取从当前路径开始的单一子节点链
+        如果子级往下多个层级都只有一个子节点，返回所有这些路径
+        """
+        paths_to_expand = [group_path]
+        current_path = group_path
+        
+        while True:
+            # 获取当前路径对应的结构
+            parts = current_path.split('/')
+            current = self.tree_structure
+            
+            for part in parts:
+                if part in current:
+                    node = current[part]
+                    current = node.get('_children', {})
+                else:
+                    return paths_to_expand
+            
+            # 检查当前层级的子节点
+            # 过滤掉以 '_' 开头的内部键
+            child_names = [name for name in current.keys() if not name.startswith('_')]
+            
+            if len(child_names) == 1:
+                # 只有一个子分组，继续展开
+                child_name = child_names[0]
+                child_node = current[child_name]
+                
+                # 检查这个子节点是否有实际的子内容（子分组或键）
+                has_children = bool(child_node.get('_children', {}))
+                has_keys = bool(child_node.get('_keys', []))
+                
+                if has_children or has_keys:
+                    next_path = f"{current_path}/{child_name}"
+                    paths_to_expand.append(next_path)
+                    current_path = next_path
+                else:
+                    break
+            else:
+                # 有多个子节点或没有子节点，停止
+                break
+        
+        return paths_to_expand
+    
     def _on_text_click(self, event):
         """处理文本点击事件"""
         # 确保鼠标在widget内才处理点击
@@ -911,7 +972,10 @@ class LeftPanel:
                 for path in to_remove:
                     self.expanded_groups.remove(path)
             else:
-                self.expanded_groups.add(group_path)
+                # 展开时，自动展开单一子节点链
+                paths_to_expand = self._get_single_child_chain(group_path)
+                for path in paths_to_expand:
+                    self.expanded_groups.add(path)
             
             self._render_tree_structure()
             self.keys_text.yview_moveto(current_view[0])
