@@ -594,7 +594,7 @@ class KeyManager:
                 total_count = len(self.original_set_data) if hasattr(self, 'original_set_data') else 0
                 self.total_count_label.config(text=f"Total: {total_count} members")
             elif key_type == 'zset':
-                total_count = len(self.original_zset_data) // 2 if hasattr(self, 'original_zset_data') else 0
+                total_count = len(self.original_zset_data) if hasattr(self, 'original_zset_data') else 0
                 self.total_count_label.config(text=f"Total: {total_count} members")
     
     def _create_filter_input(self, parent, key, key_type):
@@ -629,7 +629,7 @@ class KeyManager:
                 self.total_count_label = ttk.Label(parent, text=f"Total: {total_count} items", 
                                                   foreground='#666666')
             elif key_type == 'zset':
-                total_count = len(self.original_zset_data) // 2 if hasattr(self, 'original_zset_data') else 0
+                total_count = len(self.original_zset_data) if hasattr(self, 'original_zset_data') else 0
                 self.total_count_label = ttk.Label(parent, text=f"Total: {total_count} members", 
                                                   foreground='#666666')
             self.total_count_label.pack(side=tk.LEFT)
@@ -821,9 +821,11 @@ class KeyManager:
             self.data_tree.delete(item)
         
         if isinstance(zset_data, list):
-            for i in range(0, len(zset_data), 2):
-                if i + 1 < len(zset_data):
-                    self.data_tree.insert('', tk.END, values=(zset_data[i+1], zset_data[i]))
+            # zrange with withscores=True 返回的是元组列表 [(member, score), ...]
+            for item in zset_data:
+                if isinstance(item, tuple) and len(item) == 2:
+                    member, score = item
+                    self.data_tree.insert('', tk.END, values=(score, member))
     
     # 过滤方法
     def _filter_hash_data(self, key):
@@ -877,27 +879,27 @@ class KeyManager:
             elif key_type == 'zset':
                 if not filter_text:
                     self._load_zset_data_to_tree(self.original_zset_data)
-                    total_count = len(self.original_zset_data) // 2
+                    total_count = len(self.original_zset_data)
                     self._update_filter_status(total_count, total_count, filter_text)
                     return
                 
                 filtered_data = []
                 filter_lower = filter_text.lower()
                 
-                for i in range(0, len(self.original_zset_data), 2):
-                    if i + 1 < len(self.original_zset_data):
-                        member = self.original_zset_data[i]
-                        score = self.original_zset_data[i + 1]
+                # zset 数据是元组列表 [(member, score), ...]
+                for item in self.original_zset_data:
+                    if isinstance(item, tuple) and len(item) == 2:
+                        member, score = item
                         
                         member_str = str(member).lower()
                         score_str = str(score).lower()
                         
                         if filter_lower in member_str or filter_lower in score_str:
-                            filtered_data.extend([member, score])
+                            filtered_data.append((member, score))
                 
                 self._load_zset_data_to_tree(filtered_data)
-                filtered_count = len(filtered_data) // 2
-                total_count = len(self.original_zset_data) // 2
+                filtered_count = len(filtered_data)
+                total_count = len(self.original_zset_data)
                 self._update_filter_status(filtered_count, total_count, filter_text)
                 
         except Exception as e:
