@@ -765,7 +765,14 @@ class KeyManager:
         text_container.grid_rowconfigure(1, weight=0)  # 搜索按钮区域 - 固定高度
         text_container.grid_columnconfigure(0, weight=1)
         
-        self.value_text, self.text_frame = self._create_auto_text(text_container, str(value))
+        # 处理值的显示格式
+        display_value = self._format_value_for_display(value)
+        
+        # 确保有内容显示
+        if not display_value:
+            display_value = "(empty or unable to display)"
+        
+        self.value_text, self.text_frame = self._create_auto_text(text_container, display_value)
         
         # 设置JSON文本组件配置和语法高亮
         setup_json_text_widget(self.value_text)
@@ -773,6 +780,67 @@ class KeyManager:
         
         # 确保文本框能接收焦点和键盘事件
         self.value_text.focus_set()
+    
+    def _format_value_for_display(self, value):
+        """格式化值用于显示，处理二进制数据等特殊情况"""
+        if value is None:
+            return "(nil)"
+        
+        if isinstance(value, bytes):
+            # 处理空 bytes
+            if len(value) == 0:
+                return "(empty)"
+            
+            # 检查是否全是 null 字节（常见于 bitmap）
+            if all(b == 0 for b in value):
+                return self._format_binary_value(value)
+            
+            # 尝试解码为 UTF-8
+            try:
+                decoded = value.decode('utf-8')
+                # 检查是否包含不可打印字符（可能是二进制数据如 bitmap）
+                # 包括 null 字符 \x00
+                if any(ord(c) < 32 and c not in '\n\r\t' for c in decoded):
+                    # 包含不可打印字符，显示为十六进制
+                    return self._format_binary_value(value)
+                # 检查解码后是否为空或只有空白
+                if not decoded.strip():
+                    return self._format_binary_value(value)
+                return decoded
+            except UnicodeDecodeError:
+                # 解码失败，显示为十六进制
+                return self._format_binary_value(value)
+        
+        # 处理空字符串
+        if value == "" or value == b"":
+            return "(empty)"
+        
+        return str(value)
+    
+    def _format_binary_value(self, value):
+        """格式化二进制值（如 bitmap）为可读格式"""
+        if not isinstance(value, bytes):
+            return str(value)
+        
+        # 显示十六进制和二进制表示
+        hex_str = value.hex()
+        
+        # 格式化为每字节一组
+        hex_formatted = ' '.join(hex_str[i:i+2] for i in range(0, len(hex_str), 2))
+        
+        # 生成二进制位表示（用于 bitmap）
+        binary_str = ''.join(format(byte, '08b') for byte in value)
+        
+        # 计算设置为 1 的位数
+        bit_count = sum(bin(byte).count('1') for byte in value)
+        
+        result = f"[Binary Data - {len(value)} bytes, {bit_count} bits set]\n\n"
+        result += f"Hex: {hex_formatted}\n\n"
+        result += f"Binary: {binary_str}\n\n"
+        result += f"Raw: {repr(value)}"
+        
+        return result
+    
     
     def _create_action_buttons(self, key, key_type):
         """创建操作按钮"""

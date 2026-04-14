@@ -4,6 +4,7 @@
 """Redis操作类"""
 
 import time
+import redis
 from ..config import MAX_KEYS_STREAMING
 
 
@@ -153,7 +154,18 @@ class RedisOperations:
         
         try:
             if key_type == 'string':
-                return self.redis_client.get(key)
+                # 对于 string 类型，使用原始 bytes 获取以支持 bitmap 等二进制数据
+                # 创建一个不解码的临时连接来获取原始数据
+                try:
+                    conn_kwargs = self.redis_client.connection_pool.connection_kwargs.copy()
+                    conn_kwargs['decode_responses'] = False
+                    raw_client = redis.Redis(**conn_kwargs)
+                    raw_value = raw_client.get(key)
+                    raw_client.close()
+                    return raw_value
+                except Exception:
+                    # 如果失败，回退到普通获取
+                    return self.redis_client.get(key)
             elif key_type == 'list':
                 return self.redis_client.lrange(key, 0, -1)
             elif key_type == 'set':

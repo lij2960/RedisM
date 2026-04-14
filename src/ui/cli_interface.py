@@ -27,6 +27,8 @@ class CLIInterface:
             'ZADD', 'ZREM', 'ZRANGE', 'ZCARD', 'ZSCORE',
             'PING', 'INFO', 'SELECT', 'FLUSHDB', 'FLUSHALL', 'DBSIZE',
             'INCR', 'DECR', 'INCRBY', 'DECRBY', 'APPEND', 'STRLEN',
+            # Bitmap 命令
+            'SETBIT', 'GETBIT', 'BITCOUNT', 'BITOP', 'BITPOS', 'BITFIELD',
             # 自定义命令
             'DELPATTERN', 'COUNTPATTERN'
         ]
@@ -181,14 +183,25 @@ class CLIInterface:
             )
         return True
     
+    def _parse_command(self, command):
+        """解析命令，支持带引号的参数"""
+        import shlex
+        try:
+            # 使用 shlex 解析，支持带引号的参数
+            parts = shlex.split(command)
+            return parts
+        except ValueError:
+            # 如果 shlex 解析失败，回退到简单的 split
+            return command.split()
+    
     def _continue_execute_command(self, command):
         """继续执行命令（在连接确认后）"""
         def execute_thread():
             try:
                 redis_client = self.main_window.get_redis_client()
                 
-                # 解析命令
-                parts = command.split()
+                # 解析命令（支持带引号的参数）
+                parts = self._parse_command(command)
                 if not parts:
                     return
                 
