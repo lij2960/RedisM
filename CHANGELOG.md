@@ -5,6 +5,31 @@ All notable changes to RedisM will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.1.5] - 2026-04-15
+
+### 🚀 Added
+- **Bitmap Support**: Full support for displaying Bitmap binary data
+  - Fixed Bitmap data showing empty due to `decode_responses=True` in Redis connection
+  - Use raw bytes to fetch string type data to support binary content
+  - Smart detection of binary data with hex and binary bit representation
+  - Display byte count and number of bits set to 1
+
+- **CLI Bitmap Commands**: Added Bitmap command support
+  - SETBIT, GETBIT, BITCOUNT, BITOP, BITPOS, BITFIELD commands added to auto-complete
+  - Improved command parsing using shlex for quoted arguments support
+
+### 🔧 Fixed
+- **ZSet Display**: Fixed ZSet type data showing empty
+  - Corrected parsing of `zrange(withscores=True)` tuple list format
+  - Fixed ZSet total count calculation (removed incorrect `// 2`)
+  - Fixed ZSet filter functionality to handle tuple format correctly
+
+- **Binary Data Display**: Improved handling of binary string data
+  - Created temporary `decode_responses=False` client for raw data retrieval
+  - Added `_format_value_for_display()` method for intelligent value formatting
+  - Added `_format_binary_value()` method for hex/binary representation
+  - Handle empty bytes and null-byte data gracefully
+
 ## [1.1.4] - 2026-04-13
 
 ### 🚀 Added

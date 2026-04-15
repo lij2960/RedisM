@@ -1,10 +1,10 @@
-# RedisM v1.1.4
+# RedisM v1.1.5
 
 <div align="center">
 
 **现代化的Redis管理工具**
 
-[![Version](https://img.shields.io/badge/version-1.1.4-blue.svg)](#)
+[![Version](https://img.shields.io/badge/version-1.1.5-blue.svg)](#)
 [![Python](https://img.shields.io/badge/python-3.8+-green.svg)](https://python.org)
 [![Redis](https://img.shields.io/badge/Redis-5.0+-red.svg)](https://redis.io)
 [![Platform](https://img.shields.io/badge/platform-macOS%20%7C%20Linux%20%7C%20Windows-lightgrey.svg)](#)
@@ -28,6 +28,7 @@
 
 ### 🗄️ 数据管理
 - **全类型支持**: 完整支持String、Hash、List、Set、ZSet所有Redis数据类型
+- **Bitmap支持**: 正确显示Bitmap二进制数据，包括十六进制和二进制位表示 ⭐ 新功能
 - **可视化编辑**: 表格形式直观展示和编辑结构化数据
 - **批量操作**: 支持批量添加、删除和编辑数据项
 - **实时过滤**: 对所有数据类型提供实时搜索和过滤功能，显示统计信息
@@ -37,7 +38,7 @@
 ### 🔑 键管理
 - **树形结构**: 按分隔符自动组织键的层级结构显示
 - **智能搜索**: 支持通配符模式匹配和关键词搜索
-- **批量删除**: 支持按模式批量删除键 ⭐ 新功能
+- **批量删除**: 支持按模式批量删除键
 - **数据库一致性**: 确保所有操作在正确的数据库中执行，避免意外切换
 - **一键创建**: 支持创建所有类型的Redis键，包含TTL设置
 
@@ -50,10 +51,12 @@
 
 ### 💻 命令行界面 ⭐ 增强
 - **完整命令支持**: 内置完整的Redis命令行，支持所有Redis命令
+- **Bitmap命令**: 支持 SETBIT、GETBIT、BITCOUNT、BITOP、BITPOS、BITFIELD 命令
 - **自定义命令**: 支持 DELPATTERN 和 COUNTPATTERN 扩展命令
 - **危险命令保护**: FLUSHDB、FLUSHALL、DELPATTERN 执行前需确认
 - **实时执行**: 命令即时执行和结果显示
 - **智能补全**: Tab键自动补全命令
+- **带引号参数**: 支持带引号的参数解析
 - **大数据集优化**: 优化 SMEMBERS 等返回大量数据的命令处理
 
 ### 🆕 PHP Serialize 支持 (v1.1.2+)
@@ -308,7 +311,23 @@ RedisM/
 
 ## 📝 更新日志
 
-### v1.1.4 (2026-04-13) - 当前版本
+### v1.1.5 (2026-04-15) - 当前版本
+- 🚀 **ZSet修复**: 修复ZSet类型数据显示为空的问题
+  - 修正 `zrange(withscores=True)` 返回的元组列表解析
+  - 修复ZSet总数统计和过滤功能
+
+- 🚀 **Bitmap支持**: 完整支持Bitmap二进制数据显示
+  - 修复Bitmap数据因 `decode_responses=True` 导致显示为空的问题
+  - 使用原始bytes获取string类型数据以支持二进制内容
+  - 智能检测二进制数据并显示十六进制和二进制位表示
+  - 显示字节数和设置为1的位数统计
+
+- 🚀 **CLI增强**: 命令行界面功能扩展
+  - 新增 Bitmap 命令支持：SETBIT、GETBIT、BITCOUNT、BITOP、BITPOS、BITFIELD
+  - 改进命令解析，使用 shlex 支持带引号的参数
+  - 优化命令自动补全列表
+
+### v1.1.4 (2026-04-13)
 - 🚀 **CLI增强**: 命令行界面功能扩展
   - 新增 DELPATTERN 命令：按模式批量删除键
   - 新增 COUNTPATTERN 命令：统计匹配键数量
@@ -449,10 +468,10 @@ RedisM/
 
 <div align="center">
 
-**RedisM v1.1.4** - 让Redis管理变得简单而优雅 ✨
+**RedisM v1.1.5** - 让Redis管理变得简单而优雅 ✨
 
 Made with ❤️ for Redis developers worldwide
 
-[⬆️ 回到顶部](#redism-v114)
+[⬆️ 回到顶部](#redism-v115)
 
 </div>
