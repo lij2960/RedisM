@@ -37,9 +37,14 @@ echo "安装Python依赖..."
 pip install -r requirements.txt
 pip install pyinstaller
 
-# 创建图标
+# 创建图标（如果脚本存在）
 echo "创建应用图标..."
-python "$ICON_SCRIPT"
+if [ -f "$ICON_SCRIPT" ]; then
+    pip install Pillow 2>/dev/null || true
+    python "$ICON_SCRIPT" || echo "图标创建失败，将使用默认图标继续构建"
+else
+    echo "图标脚本不存在，跳过图标创建"
+fi
 
 # 设置图标文件
 ICON_FILE=""
@@ -54,8 +59,21 @@ rm -rf build dist
 # 创建应用程序包
 echo "创建Mac应用程序包..."
 
-# 使用自定义的spec文件进行构建
-pyinstaller RedisM.spec
+# 检查spec文件是否存在
+if [ ! -f "RedisM.spec" ]; then
+    echo "错误: RedisM.spec 文件不存在，将自动生成..."
+    pyinstaller --name="$APP_NAME" \
+        --windowed \
+        --add-data="src:src" \
+        --hidden-import=redis \
+        --hidden-import=paramiko \
+        --hidden-import=phpserialize \
+        $ICON_FILE \
+        main.py
+else
+    # 使用自定义的spec文件进行构建
+    pyinstaller RedisM.spec
+fi
 
 # 检查构建结果
 if [ -d "dist/$APP_NAME.app" ]; then
