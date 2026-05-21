@@ -811,6 +811,17 @@ class KeyManager:
                 # 解码失败，显示为十六进制
                 return self._format_binary_value(value)
         
+        if isinstance(value, str):
+            # 检查字符串是否包含二进制特征（空字符等）
+            # 这通常发生在 decode_responses=True 但值包含空字符的情况
+            if '\x00' in value:
+                # 包含空字符，可能是bitmap等二进制数据，转换为字节进行二进制展示
+                return self._format_binary_value(value.encode('utf-8', errors='replace'))
+            # 处理空字符串
+            if not value:
+                return "(empty)"
+            return value
+        
         # 处理空字符串
         if value == "" or value == b"":
             return "(empty)"

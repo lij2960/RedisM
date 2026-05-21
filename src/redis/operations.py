@@ -154,18 +154,36 @@ class RedisOperations:
         
         try:
             if key_type == 'string':
-                # 对于 string 类型，使用原始 bytes 获取以支持 bitmap 等二进制数据
-                # 创建一个不解码的临时连接来获取原始数据
+                # 先使用现有客户端获取字符串值（正确处理数据库选择）
                 try:
-                    conn_kwargs = self.redis_client.connection_pool.connection_kwargs.copy()
-                    conn_kwargs['decode_responses'] = False
-                    raw_client = redis.Redis(**conn_kwargs)
-                    raw_value = raw_client.get(key)
-                    raw_client.close()
-                    return raw_value
-                except Exception:
-                    # 如果失败，回退到普通获取
-                    return self.redis_client.get(key)
+                    value = self.redis_client.get(key)
+                    if value is None:
+                        return None
+                    # 检查字符串是否包含二进制特征（空字符等），可能是bitmap数据
+                    if isinstance(value, str) and '\x00' in value:
+                        # 包含空字符，可能是二进制数据，获取原始字节用于二进制展示
+                        try:
+                            conn_kwargs = self.redis_client.connection_pool.connection_kwargs.copy()
+                            conn_kwargs['decode_responses'] = False
+                            raw_client = redis.Redis(**conn_kwargs)
+                            raw_value = raw_client.get(key)
+                            raw_client.close()
+                            return raw_value
+                        except Exception:
+                            # 获取原始字节失败，返回字符串值
+                            return value
+                    return value
+                except UnicodeDecodeError:
+                    # 解码失败，说明是真正的二进制数据，获取原始字节
+                    try:
+                        conn_kwargs = self.redis_client.connection_pool.connection_kwargs.copy()
+                        conn_kwargs['decode_responses'] = False
+                        raw_client = redis.Redis(**conn_kwargs)
+                        raw_value = raw_client.get(key)
+                        raw_client.close()
+                        return raw_value
+                    except Exception:
+                        return f"Error: Unable to decode binary data"
             elif key_type == 'list':
                 return self.redis_client.lrange(key, 0, -1)
             elif key_type == 'set':
